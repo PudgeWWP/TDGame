@@ -23,8 +23,8 @@ var won := false
 var bow_open := false
 var sword_clock := 0.0
 var bow_clock := 0.0
-var grain_clock := 0.0
-var jade_clock := 0.0
+var workers: Array[Dictionary] = []
+var regen_clock := 0.0
 var event_clock := 0.0
 var next_event := 10.0
 var next_id := 0
@@ -55,8 +55,8 @@ func reset(permanent_level: int = 0) -> void:
 	bow_open = false
 	sword_clock = 0.0
 	bow_clock = 0.0
-	grain_clock = 0.0
-	jade_clock = 0.0
+	regen_clock = 0.0
+	reset_workers()
 	event_clock = 0.0
 	next_event = rng.randf_range(config.drop_min_interval, config.drop_max_interval)
 	next_id = 0
@@ -67,22 +67,31 @@ func level(key: String) -> int:
 	return int(levels.get(key, 0))
 
 func cost(key: String) -> int:
-	var prices := {"repair": 18, "wall": 25, "grain": 20, "jade": 30, "sword": 22, "recruit": 28, "bow": 35}
+	var prices := {
+		"base_hp": 25, "regen_amount": 24, "regen_speed": 28,
+		"worker_move": 20, "worker_yield": 22, "worker_harvest": 26, "worker_count": 40,
+		"sword_damage": 22, "sword_attack": 26, "sword_spawn": 28,
+		"bow_damage": 28, "bow_attack": 32, "bow_spawn": 34, "bow_unlock": 35
+	}
 	return int(round(int(prices[key]) * pow(1.55, level(key))))
 
 func buy(key: String) -> bool:
 	if ended or paused or grain < cost(key):
 		return false
-	if key == "repair" and hp >= max_hp:
-		return false
 	grain -= cost(key)
 	levels[key] = level(key) + 1
 	match key:
-		"repair": hp = minf(max_hp, hp + 70)
-		"wall":
+		"base_hp":
 			max_hp += 60
 			hp += 60
-		"bow": bow_open = true
+		"worker_count": sync_workers()
+		"bow_unlock": bow_open = true
+	if key.ends_with("_damage") or key.ends_with("_attack"):
+		var kind := key.get_slice("_", 0)
+		for unit in units:
+			if unit.ally and unit.kind == kind:
+				if key.ends_with("_damage"): unit.damage *= 1.25
+				else: unit.cooldown *= 0.88
 	feedback.emit("强化完成", BASE + Vector2(0, -60), Color("9a702e"))
 	return true
 
@@ -90,10 +99,11 @@ func spawn_ally(kind: String) -> void:
 	if count_side(true) >= int(config.ally_cap):
 		return
 	var spec: Dictionary = config[kind]
-	var buff := level("sword") if kind == "sword" else maxi(0, level("bow") - 1)
-	var health: float = float(spec.hp) * (1.0 + buff * 0.22)
-	new_unit(true, kind, Vector2(265 if kind == "sword" else 455, 449), health,
-		float(spec.damage) * (1.0 + buff * 0.25 + permanent * 0.05), float(spec.speed), float(spec.range), float(spec.cooldown))
+	var damage_level := level(kind + "_damage")
+	var attack_level := level(kind + "_attack")
+	new_unit(true, kind, Vector2(265 if kind == "sword" else 455, 449), float(spec.hp),
+		float(spec.damage) * pow(1.25, damage_level) * (1.0 + permanent * 0.05), float(spec.speed),
+		float(spec.range), float(spec.cooldown) * pow(0.88, attack_level))
 
 func new_unit(ally: bool, kind: String, point: Vector2, health: float, damage: float, speed: float, attack_range: float, cooldown: float) -> void:
 	next_id += 1
@@ -152,23 +162,21 @@ func tick(delta: float) -> void:
 		wave_duration = float(config.wave_interval)
 		spawn_wave()
 	sword_clock += delta
-	var recruit_interval: float = maxf(1.2, float(config.sword.spawn_interval) * pow(0.85, level("recruit")))
+	var recruit_interval: float = maxf(1.2, float(config.sword.spawn_interval) * pow(0.85, level("sword_spawn")))
 	if sword_clock >= recruit_interval:
 		sword_clock = 0.0
 		spawn_ally("sword")
 	if bow_open:
 		bow_clock += delta
-		if bow_clock >= float(config.bow.spawn_interval) * pow(0.85, level("recruit")):
+		if bow_clock >= float(config.bow.spawn_interval) * pow(0.85, level("bow_spawn")):
 			bow_clock = 0.0
 			spawn_ally("bow")
-	grain_clock += delta
-	jade_clock += delta
-	if grain_clock >= float(config.grain_interval):
-		grain_clock = 0.0
-		grain += 5 + level("grain") * 3
-	if jade_clock >= float(config.jade_interval):
-		jade_clock = 0.0
-		jade += 1 + level("jade")
+	regen_clock += delta
+	var regen_interval: float = float(config.base_regen_interval) * pow(0.85, level("regen_speed"))
+	if regen_clock >= regen_interval:
+		regen_clock = fmod(regen_clock, regen_interval)
+		hp = minf(max_hp, hp + float(config.base_regen_amount) + level("regen_amount"))
+	tick_workers(delta)
 	event_clock += delta
 	if event_clock >= next_event:
 		event_clock = 0.0
@@ -238,3 +246,50 @@ func tick(delta: float) -> void:
 		finish(false)
 	elif wave == int(config.total_waves) and count_side(false) == 0:
 		finish(true)
+
+func wave_remaining() -> float:
+	return maxf(0.0, wave_duration - wave_clock) if wave < int(config.total_waves) else 0.0
+
+func reset_workers() -> void:
+	workers.clear()
+	sync_workers()
+
+func sync_workers() -> void:
+	var required := 1 + level("worker_count")
+	for kind in ["grain", "jade"]:
+		var current := 0
+		for worker in workers:
+			if worker.kind == kind: current += 1
+		for index in range(current, required):
+			var home := Vector2(238, 363) if kind == "grain" else Vector2(482, 363)
+			var site := Vector2(155, 286) if kind == "grain" else Vector2(565, 286)
+			var offset := Vector2(0, (index - (required - 1) * 0.5) * 12.0)
+			workers.append({"kind": kind, "home": home + offset, "site": site + offset,
+				"pos": home + offset, "state": "outbound", "wait": index * 0.35, "cargo": 0})
+
+func tick_workers(delta: float) -> void:
+	for worker in workers:
+		if worker.wait > 0.0 and worker.state != "harvesting":
+			worker.wait -= delta
+			continue
+		if worker.state == "harvesting":
+			worker.wait -= delta
+			if worker.wait <= 0:
+				worker.cargo = (5 if worker.kind == "grain" else 1) + level("worker_yield") * (3 if worker.kind == "grain" else 1)
+				worker.state = "returning"
+		else:
+			var target: Vector2 = worker.home if worker.state == "returning" else worker.site
+			var move_speed: float = float(config.worker_speed) * pow(1.15, level("worker_move"))
+			worker.pos = worker.pos.move_toward(target, move_speed * delta)
+			if worker.pos.distance_to(target) < 0.01:
+				if worker.state == "returning":
+					if worker.kind == "grain": grain += int(worker.cargo)
+					else: jade += int(worker.cargo)
+					feedback.emit("+%d %s" % [worker.cargo, "粮" if worker.kind == "grain" else "玉"], worker.home + Vector2(0, -24), Color("ae803c") if worker.kind == "grain" else Color("3f675b"))
+					worker.cargo = 0
+					worker.state = "outbound"
+				else:
+					worker.state = "harvesting"
+					# Preserve the original approximate round-trip production rate.
+					var base_wait: float = maxf(0.3, float(config[worker.kind + "_interval"]) - 2.0 * worker.home.distance_to(worker.site) / float(config.worker_speed))
+					worker.wait = base_wait * pow(0.82, level("worker_harvest"))

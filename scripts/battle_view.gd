@@ -12,6 +12,7 @@ var ui_font: Font
 var floats: Array[Dictionary] = []
 var buttons: Array[Dictionary] = []
 var tab := 0
+var barracks_kind := "sword"
 var screen := "battle"
 var bank := 0
 var permanent := 0
@@ -38,7 +39,7 @@ func _ready() -> void:
 		floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
 	model.finished.connect(_on_finished)
 	if "--capture-demo" in OS.get_cmdline_user_args():
-		model.buy("bow")
+		model.buy("bow_unlock")
 		for i in range(1900):
 			model.tick(1.0 / 60.0)
 		set_process(false)
@@ -116,6 +117,8 @@ func _gui_input(event: InputEvent) -> void:
 func action(id: String) -> void:
 	if id.begins_with("tab_"):
 		tab = int(id.trim_prefix("tab_"))
+	elif id.begins_with("barracks_"):
+		barracks_kind = id.trim_prefix("barracks_")
 	elif id.begins_with("buy_"):
 		model.buy(id.trim_prefix("buy_"))
 	else:
@@ -194,8 +197,10 @@ func header() -> void:
 	label_at("战斗演示 · 长坂守备", Vector2(574, 44), 18, Color("82745e"), true)
 	draw_line(Vector2(28, 60), Vector2(692, 60), Color("b9a984"), 1)
 	label_at("%d / %d 波" % [model.wave, model.config.total_waves], Vector2(30, 104), 28, RED, false, true)
-	bar(Rect2(182, 79, 368, 12), model.wave_clock / model.wave_duration if model.wave < model.config.total_waves else 1, GOLD)
-	label_at("下波来袭  %.1f 秒" % maxf(0, model.wave_duration - model.wave_clock) if model.wave < model.config.total_waves else "末波已至 · 清剿残敌", Vector2(183, 118), 19, Color("776a55"))
+	var remaining: float = model.wave_remaining()
+	var urgent: bool = remaining <= 5.0 and model.wave < model.config.total_waves
+	bar(Rect2(182, 79, 368, 12), remaining / model.wave_duration, RED if urgent else GOLD)
+	label_at("下波来袭  %.1f 秒" % remaining if model.wave < model.config.total_waves else "末波已至 · 清剿残敌", Vector2(183, 118), 21 if urgent else 19, RED if urgent else Color("776a55"))
 	button("pause", Rect2(595, 73, 96, 49), "暂停")
 	panel(Rect2(28, 140, 322, 60), Color("e3d3ad"), Color("baa579"))
 	label_at("粮", Vector2(47, 182), 37, GOLD, false, true)
@@ -206,18 +211,17 @@ func header() -> void:
 	label_at("%d" % model.jade, Vector2(446, 181), 31)
 	label_at("本局采集", Vector2(584, 178), 19, Color("5b7264"))
 
-func resource_site(center: Vector2, glyph: String, name_text: String, progress: float, tint: Color) -> void:
+func resource_site(center: Vector2, glyph: String, name_text: String, tint: Color) -> void:
 	draw_circle(center, 44, Color(tint, 0.09))
 	draw_arc(center, 39, 0, TAU, 48, Color(tint, 0.25), 2, true)
 	label_at(glyph, center + Vector2(0, 16), 48, tint, true, true)
-	var worker := center + Vector2(cos(model.elapsed * 1.7), sin(model.elapsed * 1.7)) * 39
-	label_at("农", worker + Vector2(0, 7), 20, INK, true, true)
 	label_at(name_text, center + Vector2(0, 68), 19, tint, true)
-	bar(Rect2(center + Vector2(-44, 78), Vector2(88, 5)), progress, tint)
 
 func world() -> void:
-	resource_site(Vector2(155, 260), "禾", "粮田 · 局内", model.grain_clock / model.config.grain_interval, GOLD)
-	resource_site(Vector2(565, 260), "玉", "玉矿 · 局外", model.jade_clock / model.config.jade_interval, GREEN)
+	resource_site(Vector2(155, 260), "禾", "粮田 · 局内", GOLD)
+	resource_site(Vector2(565, 260), "玉", "玉矿 · 局外", GREEN)
+	for worker in model.workers:
+		draw_line(worker.home, worker.site, Color(0.45, 0.37, 0.23, 0.15), 9, true)
 	# Stationary fortified base.
 	panel(Rect2(248, 301, 224, 105), Color("d2c2a3"), Color("696a57"))
 	for i in range(7):
@@ -234,8 +238,12 @@ func world() -> void:
 		var active: bool = i == 0 or model.bow_open
 		panel(Rect2(x - 65, 422, 130, 65), Color("eee5d1"), GREEN if active else Color("b2aa98"))
 		label_at("刀营" if i == 0 else "弓营", Vector2(x, 457), 28, GREEN if active else Color("a69a84"), true, true)
-		bar(Rect2(x - 53, 470, 106, 5), model.sword_clock / maxf(1.2, model.config.sword.spawn_interval * pow(0.85, model.level("recruit"))) if i == 0 else (model.bow_clock / (model.config.bow.spawn_interval * pow(0.85, model.level("recruit"))) if active else 0.0), GREEN)
+		var kind := "sword" if i == 0 else "bow"
+		var interval: float = float(model.config[kind].spawn_interval) * pow(0.85, model.level(kind + "_spawn"))
+		bar(Rect2(x - 53, 470, 106, 5), (model.sword_clock if i == 0 else model.bow_clock) / interval if active else 0.0, GREEN)
 	label_at("自动出兵 %d / %d" % [model.count_side(true), model.config.ally_cap], Vector2(360, 515), 17, Color("7a7b68"), true)
+	for worker in model.workers:
+		draw_worker(worker)
 	var ordered: Array = model.units.duplicate()
 	ordered.sort_custom(func(a, b): return a.pos.y < b.pos.y)
 	for unit in ordered:
@@ -291,20 +299,47 @@ func footer() -> void:
 	draw_line(Vector2(0, 1014), Vector2(720, 1014), INK, 3)
 	for i in range(3):
 		button("tab_%d" % i, Rect2(28 + i * 232, 1030, 218, 47), ["主城", "采集", "兵营"][i], true, tab == i)
-	var keys: Array = [["repair", "wall"], ["grain", "jade"], ["sword", "recruit", "bow"]][tab]
-	var titles := {"repair": "修缮城防", "wall": "加固城墙", "grain": "粮田增产", "jade": "玉矿增产", "sword": "刀兵训练", "recruit": "征兵提速", "bow": "弓营"}
-	var details := {"repair": "恢复 70 生命", "wall": "生命上限 +60", "grain": "每次产粮 +3", "jade": "每次采玉 +1", "sword": "攻击 +25% / 生命 +22%", "recruit": "出兵间隔缩短 15%", "bow": "解锁远程弓兵" if not model.bow_open else "弓兵攻击、生命提升"}
+	if tab == 2:
+		button("barracks_sword", Rect2(172, 1085, 180, 36), "刀营", true, barracks_kind == "sword")
+		button("barracks_bow", Rect2(368, 1085, 180, 36), "弓营" if model.bow_open else "解锁弓营 · 粮%d" % model.cost("bow_unlock"), model.bow_open or model.grain >= model.cost("bow_unlock"), barracks_kind == "bow")
+		if barracks_kind == "bow" and not model.bow_open:
+			button("buy_bow_unlock", Rect2(190, 1143, 340, 62), "建造弓营 · 粮%d" % model.cost("bow_unlock"), model.grain >= model.cost("bow_unlock"), true)
+			label_at("建成后可强化弓兵的三项属性", Vector2(360, 1237), 16, Color("776c58"), true)
+			return
+	var keys: Array = [["base_hp", "regen_amount", "regen_speed"], ["worker_move", "worker_yield", "worker_harvest", "worker_count"], [barracks_kind + "_damage", barracks_kind + "_attack", barracks_kind + "_spawn"]][tab]
+	var titles := {"base_hp": "生命上限", "regen_amount": "回复血量", "regen_speed": "回复速度", "worker_move": "移动速度", "worker_yield": "采集数量", "worker_harvest": "采集速度", "worker_count": "农民个数", "sword_damage": "刀兵伤害", "sword_attack": "刀兵攻速", "sword_spawn": "刀兵产速", "bow_damage": "弓兵伤害", "bow_attack": "弓兵攻速", "bow_spawn": "弓兵产速"}
 	var width: float = (664.0 - (keys.size() - 1) * 12) / keys.size()
 	for i in range(keys.size()):
 		var key: String = keys[i]
-		var rect := Rect2(28 + i * (width + 12), 1090, width, 131)
-		var enabled: bool = model.grain >= model.cost(key) and not (key == "repair" and model.hp >= model.max_hp)
+		var rect := Rect2(28 + i * (width + 12), 1129 if tab == 2 else 1090, width, 107 if tab == 2 else 131)
+		var enabled: bool = model.grain >= model.cost(key)
 		panel(rect, Color("f2e8d3"), Color("b09a72"))
-		label_at(titles[key], rect.position + Vector2(13, 30), 25, INK, false, true)
-		label_at("%d阶" % model.level(key), rect.position + Vector2(width - 55, 28), 16, GOLD)
-		label_at(details[key], rect.position + Vector2(13, 62), 16, Color("776c58"))
-		button("buy_" + key, Rect2(rect.position + Vector2(9, 79), Vector2(width - 18, 43)), "粮 %d" % model.cost(key), enabled)
+		label_at(titles[key], rect.position + Vector2(10, 26), 21 if keys.size() == 4 else 23, INK, false, true)
+		label_at("%d阶" % model.level(key), rect.position + Vector2(width - 45, 24), 14, GOLD)
+		label_at(attribute_value(key), rect.position + Vector2(10, 51), 14, Color("776c58"))
+		button("buy_" + key, Rect2(rect.position + Vector2(8, rect.size.y - 43), Vector2(width - 16, 35)), "%s · 粮%d" % [upgrade_gain(key), model.cost(key)], enabled)
 	label_at("玉石战败全额保留  ·  散落粮草需点击拾取", Vector2(360, 1256), 18, Color("7d6e55"), true)
+
+func attribute_value(key: String) -> String:
+	match key:
+		"base_hp": return "当前 %d" % int(model.max_hp)
+		"regen_amount": return "每次 +%d" % (int(model.config.base_regen_amount) + model.level(key))
+		"regen_speed": return "每 %.1f秒" % (float(model.config.base_regen_interval) * pow(0.85, model.level(key)))
+		"worker_move": return "当前 %d" % int(float(model.config.worker_speed) * pow(1.15, model.level(key)))
+		"worker_yield": return "粮%d / 玉%d" % [5 + model.level(key) * 3, 1 + model.level(key)]
+		"worker_harvest": return "效率 +%d%%" % int((1.0 - pow(0.82, model.level(key))) * 100)
+		"worker_count": return "每处 %d人" % (1 + model.level(key))
+	var kind := key.get_slice("_", 0)
+	if key.ends_with("_damage"): return "伤害 %.1f" % (float(model.config[kind].damage) * pow(1.25, model.level(key)))
+	if key.ends_with("_attack"): return "间隔 %.2f秒" % (float(model.config[kind].cooldown) * pow(0.88, model.level(key)))
+	return "间隔 %.1f秒" % (float(model.config[kind].spawn_interval) * pow(0.85, model.level(key)))
+
+func upgrade_gain(key: String) -> String:
+	var gains := {"base_hp": "+60", "regen_amount": "+1", "regen_speed": "+15%", "worker_move": "+15%", "worker_yield": "+数量", "worker_harvest": "+18%", "worker_count": "+1人"}
+	if gains.has(key): return gains[key]
+	if key.ends_with("_damage"): return "+25%"
+	if key.ends_with("_attack"): return "+12%"
+	return "+15%"
 
 func pause_panel() -> void:
 	buttons.clear()
@@ -328,3 +363,19 @@ func result_panel() -> void:
 	button("training", Rect2(130, 696, 460, 62), "永久练兵 · %d 玉" % (8 + permanent * 5), bank >= 8 + permanent * 5)
 	button("restart", Rect2(130, 786, 460, 65), "再守一局", true, true)
 	label_at(save_error if not save_error.is_empty() else "已自动保存 · 局内粮草与强化下局重置", Vector2(360, 917), 19, RED if not save_error.is_empty() else Color("7d6e55"), true)
+
+func draw_worker(worker: Dictionary) -> void:
+	var p: Vector2 = worker.pos
+	var moving: bool = worker.state != "harvesting"
+	var step := sin(model.elapsed * 13.0) * 3.0
+	var tint := GOLD if worker.kind == "grain" else GREEN
+	draw_circle(p + Vector2(0, 13), 12, Color(0.2, 0.16, 0.1, 0.13))
+	label_at("兵", p + Vector2(0, 8 + (absf(step) if moving else 0.0)), 29, INK, true, true)
+	draw_line(p + Vector2(-10, -19), p + Vector2(10, -19), tint, 4, true)
+	draw_line(p + Vector2(-5, 10), p + Vector2(-8 - (step if moving else 0.0), 18), INK, 2, true)
+	draw_line(p + Vector2(5, 10), p + Vector2(8 + (step if moving else 0.0), 18), INK, 2, true)
+	if worker.cargo > 0:
+		draw_circle(p + Vector2(16, -2), 11, tint)
+		label_at("粮" if worker.kind == "grain" else "玉", p + Vector2(16, 3), 15, PAPER, true)
+	elif not moving:
+		draw_line(p + Vector2(13, -3), p + Vector2(24, -13 + step * 2), tint, 3, true)

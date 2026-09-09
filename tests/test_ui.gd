@@ -25,10 +25,16 @@ func run() -> void:
 	view._gui_input(event)
 	check(view.model.paused, "Pause button hit area works")
 	view.action("resume")
+	view.model.grain = 100
+	var old_max_hp: float = view.model.max_hp
+	view.action("buy_base_hp")
+	check(view.model.max_hp == old_max_hp + 60, "Base attribute card applies its upgrade")
 	view.action("tab_2")
 	check(view.tab == 2 and not view.model.paused, "Resume and tab change work")
 	view.model.grain = 100
-	view.action("buy_bow")
+	view.action("barracks_bow")
+	check(view.barracks_kind == "bow", "Barracks selector changes troop type")
+	view.action("buy_bow_unlock")
 	check(view.model.bow_open, "UI purchase unlocks barracks")
 	view.model.jade = 22
 	view.action("retreat")

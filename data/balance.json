@@ -1,16 +1,33 @@
 {
   "total_waves": 6,
-  "first_wave_delay": 6.0,
-  "wave_interval": 24.0,
+  "first_wave_delay": 6,
+  "wave_interval": 24,
   "base_hp": 260,
+  "base_regen_amount": 1,
+  "base_regen_interval": 5.0,
   "starting_grain": 45,
-  "grain_interval": 3.0,
-  "jade_interval": 7.0,
-  "drop_min_interval": 8.0,
-  "drop_max_interval": 14.0,
-  "drop_lifetime": 7.0,
+  "grain_interval": 3,
+  "jade_interval": 7,
+  "drop_min_interval": 8,
+  "drop_max_interval": 14,
+  "drop_lifetime": 7,
   "drop_amount": 15,
   "ally_cap": 32,
-  "sword": {"hp": 38.0, "damage": 7.0, "speed": 65.0, "range": 36.0, "cooldown": 0.85, "spawn_interval": 4.5},
-  "bow": {"hp": 22.0, "damage": 5.0, "speed": 55.0, "range": 180.0, "cooldown": 1.3, "spawn_interval": 6.0}
+  "sword": {
+    "hp": 38,
+    "damage": 7,
+    "speed": 65,
+    "range": 36,
+    "cooldown": 0.85,
+    "spawn_interval": 4.5
+  },
+  "bow": {
+    "hp": 22,
+    "damage": 5,
+    "speed": 55,
+    "range": 180,
+    "cooldown": 1.3,
+    "spawn_interval": 6
+  },
+  "worker_speed": 150
 }
