@@ -156,7 +156,9 @@ func tick(delta: float) -> void:
 	if ended or paused:
 		return
 	elapsed += delta
-	wave_clock += delta
+	# A new-wave countdown only advances after the battlefield is clear.
+	if count_side(false) == 0 and wave < int(config.total_waves):
+		wave_clock += delta
 	if wave < int(config.total_waves) and wave_clock >= wave_duration:
 		wave_clock = 0.0
 		wave_duration = float(config.wave_interval)
@@ -176,7 +178,7 @@ func tick(delta: float) -> void:
 	if regen_clock >= regen_interval:
 		regen_clock = fmod(regen_clock, regen_interval)
 		hp = minf(max_hp, hp + float(config.base_regen_amount) + level("regen_amount"))
-	tick_workers(delta)
+	tick_workers(delta, is_intermission())
 	event_clock += delta
 	if event_clock >= next_event:
 		event_clock = 0.0
@@ -250,6 +252,9 @@ func tick(delta: float) -> void:
 func wave_remaining() -> float:
 	return maxf(0.0, wave_duration - wave_clock) if wave < int(config.total_waves) else 0.0
 
+func is_intermission() -> bool:
+	return not ended and wave < int(config.total_waves) and count_side(false) == 0
+
 func reset_workers() -> void:
 	workers.clear()
 	sync_workers()
@@ -267,8 +272,20 @@ func sync_workers() -> void:
 			workers.append({"kind": kind, "home": home + offset, "site": site + offset,
 				"pos": home + offset, "state": "outbound", "wait": index * 0.35, "cargo": 0})
 
-func tick_workers(delta: float) -> void:
+func tick_workers(delta: float, can_gather: bool) -> void:
 	for worker in workers:
+		if not can_gather:
+			# Workers abandon harvesting and shelter at camp during every combat wave.
+			worker.state = "retreating"
+			worker.wait = 0.0
+			var retreat_speed: float = float(config.worker_speed) * pow(1.20, level("worker_move"))
+			worker.pos = worker.pos.move_toward(worker.home, retreat_speed * delta)
+			if worker.pos.distance_to(worker.home) < 0.01:
+				worker.pos = worker.home
+				worker.state = "sheltered"
+			continue
+		if worker.state == "sheltered":
+			worker.state = "returning" if int(worker.cargo) > 0 else "outbound"
 		if worker.wait > 0.0 and worker.state != "harvesting":
 			worker.wait -= delta
 			continue
@@ -279,7 +296,7 @@ func tick_workers(delta: float) -> void:
 				worker.state = "returning"
 		else:
 			var target: Vector2 = worker.home if worker.state == "returning" else worker.site
-			var move_speed: float = float(config.worker_speed) * pow(1.15, level("worker_move"))
+			var move_speed: float = float(config.worker_speed) * pow(1.20, level("worker_move"))
 			worker.pos = worker.pos.move_toward(target, move_speed * delta)
 			if worker.pos.distance_to(target) < 0.01:
 				if worker.state == "returning":

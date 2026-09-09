@@ -198,9 +198,11 @@ func header() -> void:
 	draw_line(Vector2(28, 60), Vector2(692, 60), Color("b9a984"), 1)
 	label_at("%d / %d 波" % [model.wave, model.config.total_waves], Vector2(30, 104), 28, RED, false, true)
 	var remaining: float = model.wave_remaining()
-	var urgent: bool = remaining <= 5.0 and model.wave < model.config.total_waves
-	bar(Rect2(182, 79, 368, 12), remaining / model.wave_duration, RED if urgent else GOLD)
-	label_at("下波来袭  %.1f 秒" % remaining if model.wave < model.config.total_waves else "末波已至 · 清剿残敌", Vector2(183, 118), 21 if urgent else 19, RED if urgent else Color("776a55"))
+	var preparing: bool = model.is_intermission()
+	var urgent: bool = preparing and remaining <= 5.0
+	bar(Rect2(182, 79, 368, 12), remaining / model.wave_duration, RED if urgent or not preparing else GOLD)
+	var wave_text := "下波来袭  %.1f 秒" % remaining if preparing else ("末波已至 · 清剿残敌" if model.wave >= model.config.total_waves else "本波交战中 · 敌军 %d" % model.count_side(false))
+	label_at(wave_text, Vector2(183, 118), 21 if urgent else 19, RED if urgent or not preparing else Color("776a55"))
 	button("pause", Rect2(595, 73, 96, 49), "暂停")
 	panel(Rect2(28, 140, 322, 60), Color("e3d3ad"), Color("baa579"))
 	label_at("粮", Vector2(47, 182), 37, GOLD, false, true)
@@ -325,7 +327,7 @@ func attribute_value(key: String) -> String:
 		"base_hp": return "当前 %d" % int(model.max_hp)
 		"regen_amount": return "每次 +%d" % (int(model.config.base_regen_amount) + model.level(key))
 		"regen_speed": return "每 %.1f秒" % (float(model.config.base_regen_interval) * pow(0.85, model.level(key)))
-		"worker_move": return "当前 %d" % int(float(model.config.worker_speed) * pow(1.15, model.level(key)))
+		"worker_move": return "当前 %d" % int(float(model.config.worker_speed) * pow(1.20, model.level(key)))
 		"worker_yield": return "粮%d / 玉%d" % [5 + model.level(key) * 3, 1 + model.level(key)]
 		"worker_harvest": return "效率 +%d%%" % int((1.0 - pow(0.82, model.level(key))) * 100)
 		"worker_count": return "每处 %d人" % (1 + model.level(key))
@@ -335,7 +337,7 @@ func attribute_value(key: String) -> String:
 	return "间隔 %.1f秒" % (float(model.config[kind].spawn_interval) * pow(0.85, model.level(key)))
 
 func upgrade_gain(key: String) -> String:
-	var gains := {"base_hp": "+60", "regen_amount": "+1", "regen_speed": "+15%", "worker_move": "+15%", "worker_yield": "+数量", "worker_harvest": "+18%", "worker_count": "+1人"}
+	var gains := {"base_hp": "+60", "regen_amount": "+1", "regen_speed": "+15%", "worker_move": "+20%", "worker_yield": "+数量", "worker_harvest": "+18%", "worker_count": "+1人"}
 	if gains.has(key): return gains[key]
 	if key.ends_with("_damage"): return "+25%"
 	if key.ends_with("_attack"): return "+12%"
@@ -366,7 +368,7 @@ func result_panel() -> void:
 
 func draw_worker(worker: Dictionary) -> void:
 	var p: Vector2 = worker.pos
-	var moving: bool = worker.state != "harvesting"
+	var moving: bool = worker.state != "harvesting" and worker.state != "sheltered"
 	var step := sin(model.elapsed * 13.0) * 3.0
 	var tint := GOLD if worker.kind == "grain" else GREEN
 	draw_circle(p + Vector2(0, 13), 12, Color(0.2, 0.16, 0.1, 0.13))
