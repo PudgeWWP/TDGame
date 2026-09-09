@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://dljkgx2t7wcfk"]
+[gd_scene format=3 uid="uid://dljkgx2t7wcfk"]
 
-[ext_resource type="Script" path="res://scripts/battle_view.gd" id="1"]
+[ext_resource type="Script" uid="uid://dogdmns6ky20j" path="res://scripts/battle_view.gd" id="1"]
 
-[node name="Battle" type="Control"]
+[node name="Battle" type="Control" unique_id=126950195]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
