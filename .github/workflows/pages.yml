@@ -44,11 +44,14 @@ jobs:
         shell: bash
         run: |
           "./Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64" \
+            --headless --path . --import
+          "./Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64" \
             --headless --path . --script res://tests/test_ui.gd
 
       - name: Export Web build
         shell: bash
         run: |
+          mkdir -p builds/web
           "./Godot_v${GODOT_VERSION}-${GODOT_STATUS}_linux.x86_64" \
             --headless --path . --export-release Web builds/web/index.html
           touch builds/web/.nojekyll
