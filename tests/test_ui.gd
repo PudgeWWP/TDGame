@@ -66,9 +66,26 @@ func run() -> void:
 	check(not bool(view.settings.music) and not bool(view.settings.damage_numbers), "Profile settings can be disabled")
 	view.action("close_modal")
 	check(view.screen == "home" and view.modal.is_empty(), "Profile close button returns to the visible home screen")
+	view.queue_redraw()
+	await process_frame
+	var home_actions: Array[String] = []
+	var home_rects := {}
+	for item in view.buttons:
+		home_actions.append(str(item.id))
+		home_rects[str(item.id)] = item.rect
+	check(home_actions.slice(-5) == ["entry_strategy", "entry_armory", "home", "entry_campaign", "entry_pvp"], "Home navigation exposes all five entries in order")
+	check(home_rects.entry_strategy.position.y == home_rects.entry_armory.position.y and home_rects.entry_campaign.position.y == home_rects.entry_pvp.position.y and home_rects.entry_strategy.position.y == home_rects.entry_campaign.position.y, "Four side navigation buttons share one horizontal line")
+	check(home_rects.home.size.x > home_rects.entry_strategy.size.x and home_rects.home.size.y > home_rects.entry_strategy.size.y, "Center battle navigation is larger than side entries")
 	view.action("entry_strategy")
 	check(view.modal == "coming" and view.modal_title == "军略", "Strategy entry is available")
 	view.action("close_modal")
+	view.action("entry_armory")
+	check(view.modal == "coming" and view.modal_title == "武备", "Armory entry is available")
+	view.action("close_modal")
+	view.action("entry_pvp")
+	check(view.modal == "coming" and view.modal_title == "演武", "PVP entry is available")
+	view.action("home")
+	check(view.screen == "home" and view.modal.is_empty(), "Battle navigation returns to the home screen")
 	view.action("start_battle")
 	check(view.screen == "battle", "Start button enters battle")
 	check(int(view.profile_stats.challenge_count) == 1, "Starting a run records one challenge")

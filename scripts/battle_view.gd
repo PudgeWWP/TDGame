@@ -57,6 +57,14 @@ func _ready() -> void:
 		if bool(settings.damage_numbers) or not t.begins_with("-"):
 			floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
 	model.finished.connect(_on_finished)
+	if "--capture-home" in OS.get_cmdline_user_args():
+		screen = "home"
+		modal = ""
+		set_process(false)
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("user://home_preview.png")
+		get_tree().quit()
 	if "--capture-avatar" in OS.get_cmdline_user_args():
 		screen = "home"
 		modal = "avatar"
@@ -268,8 +276,8 @@ func action(id: String) -> void:
 			"home":
 				modal = ""
 				screen = "home"
-			"entry_campaign", "entry_shop", "entry_strategy", "entry_training", "entry_bug", "entry_suggestion":
-				modal_title = {"entry_campaign": "战役", "entry_shop": "商肆", "entry_strategy": "军略", "entry_training": "校场", "entry_bug": "BUG反馈", "entry_suggestion": "建议反馈"}[id]
+			"entry_strategy", "entry_armory", "entry_campaign", "entry_pvp", "entry_bug", "entry_suggestion":
+				modal_title = {"entry_strategy": "军略", "entry_armory": "武备", "entry_campaign": "战役", "entry_pvp": "演武", "entry_bug": "BUG反馈", "entry_suggestion": "建议反馈"}[id]
 				modal = "coming"
 			"toggle_music":
 				settings.music = not bool(settings.music)
@@ -391,11 +399,13 @@ func home_screen() -> void:
 
 	button("start_battle", Rect2(88, 806, 544, 88), "开始守城", true, true)
 
-	var nav_ids := ["entry_shop", "entry_campaign", "entry_strategy", "entry_training"]
-	var nav_titles := ["商肆", "战役", "军略", "校场"]
-	for i in range(4):
-		var x := 22 + i * 174
-		button(nav_ids[i], Rect2(x, 1140, 154, 92), nav_titles[i])
+	var nav_ids := ["entry_strategy", "entry_armory", "home", "entry_campaign", "entry_pvp"]
+	var nav_titles := ["军略", "武备", "战斗", "战役", "演武"]
+	var nav_x := [18, 150, 274, 454, 586]
+	for i in range(5):
+		var is_battle := i == 2
+		var rect := Rect2(nav_x[i], 1130 if is_battle else 1150, 172 if is_battle else 116, 122 if is_battle else 82)
+		button(nav_ids[i], rect, nav_titles[i], true, is_battle)
 
 func profile_panel() -> void:
 	buttons.clear()
