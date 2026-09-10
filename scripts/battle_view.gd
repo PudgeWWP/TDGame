@@ -229,14 +229,7 @@ func home_screen() -> void:
 	label_at("将", Vector2(84, 140), 45, PAPER, true, true)
 	label_at("无名校尉", Vector2(84, 178), 16, INK, true)
 	buttons.append({"id": "profile", "rect": Rect2(28, 78, 112, 112), "enabled": true})
-	label_at("主将档案", Vector2(157, 113), 24, INK, false, true)
-	label_at("点击头像查看个人信息", Vector2(157, 145), 17, Color("7d6e55"))
-	panel(Rect2(475, 79, 217, 65), Color("d9dfd0"), Color("8c9b83"))
-	draw_circle(Vector2(512, 111), 19, Color(GREEN, 0.12))
-	draw_arc(Vector2(512, 111), 18, 0, TAU, 32, GREEN, 2, true)
-	label_at("玉", Vector2(512, 119), 23, GREEN, true, true)
-	label_at("%d" % bank, Vector2(544, 121), 29, INK)
-	label_at("府库", Vector2(661, 119), 15, Color("65766a"), true)
+	resource_counter(Vector2(615, 35), "玉", bank, GREEN)
 
 	# The central seal is temporary typographic art and can be replaced independently later.
 	draw_circle(Vector2(360, 389), 145, Color(0.37, 0.32, 0.22, 0.06))
@@ -245,18 +238,13 @@ func home_screen() -> void:
 	label_at("墨 阵 三 国", Vector2(360, 493), 35, INK, true, true)
 	label_at("聚将于营 · 决胜长坂", Vector2(360, 531), 20, Color("83755f"), true)
 
-	button("start_battle", Rect2(88, 760, 544, 88), "开始守城", true, true)
-	label_at("进入当前基础战斗玩法", Vector2(360, 879), 18, Color("7d6e55"), true)
-	button("entry_campaign", Rect2(151, 912, 418, 62), "战役 · 其他玩法入口")
+	button("start_battle", Rect2(88, 806, 544, 88), "开始守城", true, true)
 
 	var nav_ids := ["entry_shop", "entry_campaign", "entry_strategy", "entry_training"]
 	var nav_titles := ["商肆", "战役", "军略", "校场"]
-	var nav_notes := ["购买", "玩法", "天赋", "强化"]
 	for i in range(4):
 		var x := 22 + i * 174
-		button(nav_ids[i], Rect2(x, 1115, 154, 92), nav_titles[i])
-		label_at(nav_notes[i], Vector2(x + 77, 1233), 16, Color("847660"), true)
-	label_at("军略：天赋研习  ·  校场：永久属性养成", Vector2(360, 1265), 17, Color("786b56"), true)
+		button(nav_ids[i], Rect2(x, 1140, 154, 92), nav_titles[i])
 
 func profile_panel() -> void:
 	buttons.clear()
