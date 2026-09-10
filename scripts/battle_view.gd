@@ -159,6 +159,12 @@ func bar(rect: Rect2, ratio: float, tint: Color) -> void:
 	draw_rect(rect, Color("c6bda9"))
 	draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(ratio, 0, 1), rect.size.y)), tint)
 
+func resource_counter(center: Vector2, glyph: String, amount: int, tint: Color) -> void:
+	draw_circle(center, 16, Color(tint, 0.13))
+	draw_arc(center, 15, 0, TAU, 32, tint, 2, true)
+	label_at(glyph, center + Vector2(0, 7), 20, tint, true, true)
+	label_at("%d" % amount, center + Vector2(25, 8), 23, INK)
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("272a26"))
 	var tr := transform_info()
@@ -194,7 +200,8 @@ func background() -> void:
 
 func header() -> void:
 	label_at("墨阵三国", Vector2(30, 46), 30, INK, false, true)
-	label_at("战斗演示 · 长坂守备", Vector2(574, 44), 18, Color("82745e"), true)
+	resource_counter(Vector2(508, 35), "粮", model.grain, GOLD)
+	resource_counter(Vector2(615, 35), "玉", model.jade, GREEN)
 	draw_line(Vector2(28, 60), Vector2(692, 60), Color("b9a984"), 1)
 	label_at("%d / %d 波" % [model.wave, model.config.total_waves], Vector2(30, 104), 28, RED, false, true)
 	var remaining: float = model.wave_remaining()
@@ -204,14 +211,6 @@ func header() -> void:
 	var wave_text := "下波来袭  %.1f 秒" % remaining if preparing else ("末波已至 · 清剿残敌" if model.wave >= model.config.total_waves else "本波交战中 · 敌军 %d" % model.count_side(false))
 	label_at(wave_text, Vector2(183, 118), 21 if urgent else 19, RED if urgent or not preparing else Color("776a55"))
 	button("pause", Rect2(595, 73, 96, 49), "暂停")
-	panel(Rect2(28, 140, 322, 60), Color("e3d3ad"), Color("baa579"))
-	label_at("粮", Vector2(47, 182), 37, GOLD, false, true)
-	label_at("%d" % model.grain, Vector2(104, 181), 31)
-	label_at("局内强化", Vector2(242, 178), 19, Color("776a55"))
-	panel(Rect2(370, 140, 322, 60), Color("d9dfd0"), Color("9ba890"))
-	label_at("玉", Vector2(389, 182), 37, GREEN, false, true)
-	label_at("%d" % model.jade, Vector2(446, 181), 31)
-	label_at("本局采集", Vector2(584, 178), 19, Color("5b7264"))
 
 func resource_site(center: Vector2, glyph: String, name_text: String, tint: Color) -> void:
 	draw_circle(center, 44, Color(tint, 0.09))
@@ -220,30 +219,30 @@ func resource_site(center: Vector2, glyph: String, name_text: String, tint: Colo
 	label_at(name_text, center + Vector2(0, 68), 19, tint, true)
 
 func world() -> void:
-	resource_site(Vector2(155, 260), "禾", "粮田 · 局内", GOLD)
-	resource_site(Vector2(565, 260), "玉", "玉矿 · 局外", GREEN)
+	resource_site(Vector2(155, 195), "禾", "粮田 · 局内", GOLD)
+	resource_site(Vector2(565, 195), "玉", "玉矿 · 局外", GREEN)
 	for worker in model.workers:
 		draw_line(worker.home, worker.site, Color(0.45, 0.37, 0.23, 0.15), 9, true)
 	# Stationary fortified base.
-	panel(Rect2(248, 301, 224, 105), Color("d2c2a3"), Color("696a57"))
+	panel(Rect2(248, 236, 224, 105), Color("d2c2a3"), Color("696a57"))
 	for i in range(7):
-		draw_rect(Rect2(250 + i * 32, 290, 20, 22), Color("696a57"))
-	label_at("蜀", Vector2(360, 365), 61, INK, true, true)
-	label_at("长坂主营", Vector2(360, 392), 19, INK, true)
-	bar(Rect2(260, 280, 200, 9), model.hp / model.max_hp, GREEN)
-	label_at("%d / %d" % [int(model.hp), int(model.max_hp)], Vector2(360, 269), 19, GREEN, true)
-	draw_line(Vector2(473, 307), Vector2(473, 247), INK, 3)
-	draw_colored_polygon(PackedVector2Array([Vector2(474, 248), Vector2(506, 251), Vector2(500, 281), Vector2(474, 278)]), RED)
-	label_at("蜀", Vector2(487, 271), 20, PAPER, true, true)
+		draw_rect(Rect2(250 + i * 32, 225, 20, 22), Color("696a57"))
+	label_at("蜀", Vector2(360, 300), 61, INK, true, true)
+	label_at("长坂主营", Vector2(360, 327), 19, INK, true)
+	bar(Rect2(260, 215, 200, 9), model.hp / model.max_hp, GREEN)
+	label_at("%d / %d" % [int(model.hp), int(model.max_hp)], Vector2(360, 204), 19, GREEN, true)
+	draw_line(Vector2(473, 242), Vector2(473, 182), INK, 3)
+	draw_colored_polygon(PackedVector2Array([Vector2(474, 183), Vector2(506, 186), Vector2(500, 216), Vector2(474, 213)]), RED)
+	label_at("蜀", Vector2(487, 206), 20, PAPER, true, true)
 	for i in range(2):
 		var x := 265 + i * 190
 		var active: bool = i == 0 or model.bow_open
-		panel(Rect2(x - 65, 422, 130, 65), Color("eee5d1"), GREEN if active else Color("b2aa98"))
-		label_at("刀营" if i == 0 else "弓营", Vector2(x, 457), 28, GREEN if active else Color("a69a84"), true, true)
+		panel(Rect2(x - 65, 357, 130, 65), Color("eee5d1"), GREEN if active else Color("b2aa98"))
+		label_at("刀营" if i == 0 else "弓营", Vector2(x, 392), 28, GREEN if active else Color("a69a84"), true, true)
 		var kind := "sword" if i == 0 else "bow"
 		var interval: float = float(model.config[kind].spawn_interval) * pow(0.85, model.level(kind + "_spawn"))
-		bar(Rect2(x - 53, 470, 106, 5), (model.sword_clock if i == 0 else model.bow_clock) / interval if active else 0.0, GREEN)
-	label_at("自动出兵 %d / %d" % [model.count_side(true), model.config.ally_cap], Vector2(360, 515), 17, Color("7a7b68"), true)
+		bar(Rect2(x - 53, 405, 106, 5), (model.sword_clock if i == 0 else model.bow_clock) / interval if active else 0.0, GREEN)
+	label_at("自动出兵 %d / %d" % [model.count_side(true), model.config.ally_cap], Vector2(360, 450), 17, Color("7a7b68"), true)
 	for worker in model.workers:
 		draw_worker(worker)
 	var ordered: Array = model.units.duplicate()

@@ -29,7 +29,7 @@ var event_clock := 0.0
 var next_event := 10.0
 var next_id := 0
 var permanent := 0
-const BASE := Vector2(360, 356)
+const BASE := Vector2(360, 291)
 
 func _init() -> void:
 	rng.randomize()
@@ -101,7 +101,7 @@ func spawn_ally(kind: String) -> void:
 	var spec: Dictionary = config[kind]
 	var damage_level := level(kind + "_damage")
 	var attack_level := level(kind + "_attack")
-	new_unit(true, kind, Vector2(265 if kind == "sword" else 455, 449), float(spec.hp),
+	new_unit(true, kind, Vector2(265 if kind == "sword" else 455, 384), float(spec.hp),
 		float(spec.damage) * pow(1.25, damage_level) * (1.0 + permanent * 0.05), float(spec.speed),
 		float(spec.range), float(spec.cooldown) * pow(0.88, attack_level))
 
@@ -210,7 +210,7 @@ func tick(delta: float) -> void:
 		var target_pos: Vector2 = BASE
 		var target_base := false
 		if unit.ally:
-			target_pos = target.pos if not target.is_empty() else Vector2(140 + (int(unit.id) % 9) * 55, 525 + (int(unit.id) % 3) * 30)
+			target_pos = target.pos if not target.is_empty() else Vector2(140 + (int(unit.id) % 9) * 55, 460 + (int(unit.id) % 3) * 30)
 		else:
 			# Enemies intercept nearby soldiers; otherwise advance on the stationary base.
 			if not target.is_empty() and nearest < 210:
@@ -266,8 +266,8 @@ func sync_workers() -> void:
 		for worker in workers:
 			if worker.kind == kind: current += 1
 		for index in range(current, required):
-			var home := Vector2(238, 363) if kind == "grain" else Vector2(482, 363)
-			var site := Vector2(155, 286) if kind == "grain" else Vector2(565, 286)
+			var home := Vector2(238, 298) if kind == "grain" else Vector2(482, 298)
+			var site := Vector2(155, 221) if kind == "grain" else Vector2(565, 221)
 			var offset := Vector2(0, (index - (required - 1) * 0.5) * 12.0)
 			workers.append({"kind": kind, "home": home + offset, "site": site + offset,
 				"pos": home + offset, "state": "outbound", "wait": index * 0.35, "cargo": 0})
