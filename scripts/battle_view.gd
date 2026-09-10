@@ -41,7 +41,12 @@ func _ready() -> void:
 	var u := SystemFont.new()
 	u.font_names = PackedStringArray(["Microsoft YaHei", "sans-serif"])
 	ui_font = u
-	if FileAccess.file_exists("res://assets/fonts/demo.ttf"):
+	# Web exports cannot use the desktop system font fallback. Keep a complete
+	# Simplified Chinese font in the project so every platform draws the same text.
+	if ResourceLoader.exists("res://assets/fonts/NotoSansSC-Regular.otf"):
+		font = load("res://assets/fonts/NotoSansSC-Regular.otf")
+		ui_font = font
+	elif ResourceLoader.exists("res://assets/fonts/demo.ttf"):
 		font = load("res://assets/fonts/demo.ttf")
 		ui_font = font
 	if "--demo-test" in OS.get_cmdline_user_args():
@@ -423,29 +428,27 @@ func avatar_panel() -> void:
 	draw_rect(Rect2(0, 0, 720, 1280), Color(0.10, 0.11, 0.10, 0.58))
 	draw_rect(Rect2(66, 210, 588, 850), Color("302e28"))
 	draw_rect(Rect2(66, 210, 588, 850), GOLD, false, 3)
-	label_at("当前头像", Vector2(360, 260), 27, PAPER, true, true)
-	draw_avatar_tile(Rect2(285, 282, 150, 142), current_avatar, true, selected_avatar == current_avatar)
-	label_at("选择头像", Vector2(102, 470), 24, PAPER, false, true)
-	draw_line(Vector2(102, 484), Vector2(618, 484), Color("8e8068"), 1)
-
+	var grid_view := Rect2(68, 505, 570, 420)
 	var grid_top := 505.0
 	for index in range(AVATAR_GLYPHS.size()):
 		var row := index / 3
 		var column := index % 3
-		var rect := Rect2(94 + column * 177, grid_top + row * 145 - avatar_scroll, 150, 132)
-		if rect.end.y > 495 and rect.position.y < 925:
+		var rect := Rect2(108 + column * 177, grid_top + row * 145 - avatar_scroll, 150, 132)
+		if rect.intersects(grid_view):
 			var unlocked := index < TEST_UNLOCKED_AVATARS
 			draw_avatar_tile(rect, index, unlocked, selected_avatar == index)
 			if unlocked:
-				buttons.append({"id": "avatar_choice_%d" % index, "rect": rect, "enabled": true})
-	# Mask only the overflow; partially visible edge rows show that the list continues.
-	draw_rect(Rect2(66, 470, 588, 25), Color("302e28"))
-	draw_rect(Rect2(66, 925, 588, 25), Color("302e28"))
+				buttons.append({"id": "avatar_choice_%d" % index, "rect": rect.intersection(grid_view), "enabled": true})
+	# Redraw the fixed areas over the scrolling cards to clip all overflow.
+	draw_rect(Rect2(68, 212, 584, 293), Color("302e28"))
+	draw_rect(Rect2(68, 925, 584, 133), Color("302e28"))
+	label_at("当前头像", Vector2(360, 260), 27, PAPER, true, true)
+	draw_avatar_tile(Rect2(285, 282, 150, 142), current_avatar, true, selected_avatar == current_avatar)
 	label_at("选择头像", Vector2(102, 470), 24, PAPER, false, true)
 	draw_line(Vector2(102, 484), Vector2(618, 484), Color("8e8068"), 1)
 	var scroll_ratio := avatar_scroll / AVATAR_SCROLL_MAX
-	draw_rect(Rect2(632, 505, 5, 412), Color("5e584d"))
-	draw_rect(Rect2(632, 505 + scroll_ratio * 292, 5, 120), Color("d2bd8b"))
+	draw_rect(Rect2(637, 505, 2, 412), Color("5e584d"))
+	draw_rect(Rect2(637, 505 + scroll_ratio * 292, 2, 120), Color("d2bd8b"))
 	avatar_change_button(Rect2(190, 955, 340, 67))
 	draw_circle(Vector2(90, 222), 31, Color("302e28"))
 	draw_circle(Vector2(90, 222), 29, Color("f1e7d3"))
