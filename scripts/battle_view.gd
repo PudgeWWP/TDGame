@@ -445,7 +445,7 @@ func avatar_panel() -> void:
 	draw_rect(Rect2(68, 212, 584, 293), Color("302e28"))
 	draw_rect(Rect2(68, 925, 584, 133), Color("302e28"))
 	label_at("当前头像", Vector2(360, 260), 27, PAPER, true, true)
-	draw_avatar_tile(Rect2(285, 282, 150, 142), current_avatar, true, selected_avatar == current_avatar)
+	draw_avatar_tile(Rect2(285, 282, 150, 142), current_avatar, true, false)
 	label_at("选择头像", Vector2(102, 470), 24, PAPER, false, true)
 	draw_line(Vector2(102, 484), Vector2(618, 484), Color("8e8068"), 1)
 	var scroll_ratio := avatar_scroll / AVATAR_SCROLL_MAX
@@ -458,7 +458,12 @@ func avatar_panel() -> void:
 	buttons.append({"id": "close_avatar", "rect": Rect2(58, 190, 64, 64), "enabled": true})
 
 func draw_avatar_tile(rect: Rect2, index: int, unlocked: bool, selected: bool, in_use := false) -> void:
-	panel(rect, Color("d8c8aa"), GOLD if selected else Color("746955"))
+	if selected:
+		draw_rect(rect.grow(5), Color(1.0, 0.78, 0.20, 0.32), false, 7)
+		panel(rect, Color("f2dfae"), Color("f6bd2f"))
+		draw_rect(rect, Color("f6bd2f"), false, 6)
+	else:
+		panel(rect, Color("d8c8aa"), Color("746955"))
 	draw_circle(rect.position + Vector2(rect.size.x * 0.5, 52), 35, Color("69766c"))
 	label_at(AVATAR_GLYPHS[index], rect.position + Vector2(rect.size.x * 0.5, 66), 48, PAPER, true, true)
 	label_at("头像 %02d" % (index + 1), rect.position + Vector2(rect.size.x * 0.5, 116), 16, INK, true)
