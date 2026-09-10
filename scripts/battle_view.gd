@@ -22,6 +22,8 @@ var bank_before := 0
 var save_error := ""
 var save_path := "user://campaign_v1.json"
 var accumulator := 0.0
+var settings := {"music": true, "sound": true, "damage_numbers": true}
+var profile_stats := {"challenge_count": 0, "best_progress": 0, "avatars": 0, "campaigns": 0, "talents": 0}
 
 func _ready() -> void:
 	var f := SystemFont.new()
@@ -38,8 +40,16 @@ func _ready() -> void:
 	load_campaign()
 	model.reset(permanent)
 	model.feedback.connect(func(t: String, p: Vector2, c: Color):
-		floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
+		if bool(settings.damage_numbers) or not t.begins_with("-"):
+			floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
 	model.finished.connect(_on_finished)
+	if "--capture-profile" in OS.get_cmdline_user_args():
+		screen = "profile"
+		set_process(false)
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("user://profile_preview.png")
+		get_tree().quit()
 	if "--capture-demo" in OS.get_cmdline_user_args():
 		model.buy("bow_unlock")
 		for i in range(1900):
@@ -59,13 +69,21 @@ func load_campaign() -> void:
 	if data is Dictionary and int(data.get("version", 0)) == 1:
 		bank = maxi(0, int(data.get("jade", 0)))
 		permanent = maxi(0, int(data.get("training", 0)))
+		var saved_settings: Dictionary = data.get("settings", {})
+		settings.music = bool(saved_settings.get("music", true))
+		settings.sound = bool(saved_settings.get("sound", true))
+		settings.damage_numbers = bool(saved_settings.get("damage_numbers", true))
+		var saved_stats: Dictionary = data.get("profile_stats", {})
+		for key in profile_stats:
+			profile_stats[key] = maxi(0, int(saved_stats.get(key, profile_stats[key])))
 
 func save_campaign() -> bool:
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
 		save_error = "存档失败，请保持窗口开启后重试"
 		return false
-	file.store_string(JSON.stringify({"version": 1, "jade": bank, "training": permanent}))
+	file.store_string(JSON.stringify({"version": 1, "jade": bank, "training": permanent,
+		"settings": settings, "profile_stats": profile_stats}))
 	file.close()
 	save_error = ""
 	return true
@@ -73,6 +91,8 @@ func save_campaign() -> bool:
 func _on_finished(_victory: bool, amount: int) -> void:
 	bank_before = bank
 	bank += amount
+	var progress := roundi(float(model.wave) / float(model.config.total_waves) * 100.0)
+	profile_stats.best_progress = maxi(int(profile_stats.best_progress), progress)
 	save_campaign()
 	screen = "result"
 
@@ -125,19 +145,31 @@ func action(id: String) -> void:
 		model.buy(id.trim_prefix("buy_"))
 	else:
 		match id:
-			"profile": modal = "profile"
+			"profile": screen = "profile"
+			"back_home": screen = "home"
 			"close_modal": modal = ""
 			"start_battle":
 				model.reset(permanent)
 				floats.clear()
 				modal = ""
 				screen = "battle"
+				profile_stats.challenge_count = int(profile_stats.challenge_count) + 1
+				save_campaign()
 			"home":
 				modal = ""
 				screen = "home"
-			"entry_campaign", "entry_shop", "entry_strategy", "entry_training":
-				modal_title = {"entry_campaign": "战役", "entry_shop": "商肆", "entry_strategy": "军略", "entry_training": "校场"}[id]
+			"entry_campaign", "entry_shop", "entry_strategy", "entry_training", "entry_bug", "entry_suggestion":
+				modal_title = {"entry_campaign": "战役", "entry_shop": "商肆", "entry_strategy": "军略", "entry_training": "校场", "entry_bug": "BUG反馈", "entry_suggestion": "建议反馈"}[id]
 				modal = "coming"
+			"toggle_music":
+				settings.music = not bool(settings.music)
+				save_campaign()
+			"toggle_sound":
+				settings.sound = not bool(settings.sound)
+				save_campaign()
+			"toggle_damage_numbers":
+				settings.damage_numbers = not bool(settings.damage_numbers)
+				save_campaign()
 			"pause": model.paused = true
 			"resume": model.paused = false
 			"retreat": model.finish(false)
@@ -147,6 +179,8 @@ func action(id: String) -> void:
 				model.reset(permanent)
 				floats.clear()
 				screen = "battle"
+				profile_stats.challenge_count = int(profile_stats.challenge_count) + 1
+				save_campaign()
 			"training":
 				var price := 8 + permanent * 5
 				if bank >= price:
@@ -170,6 +204,11 @@ func button(id: String, rect: Rect2, title: String, enabled: bool = true, filled
 	label_at(title, rect.get_center() + Vector2(0, 9), 25, Color("fff1d6") if filled else (INK if enabled else Color("ac9f89")), true)
 	buttons.append({"id": id, "rect": rect, "enabled": enabled})
 
+func setting_toggle(id: String, rect: Rect2, title: String, active: bool) -> void:
+	panel(rect, Color("e0b947") if active else Color("d4d0c6"), Color("7f735e"))
+	label_at("%s  %s" % [title, "开" if active else "关"], rect.get_center() + Vector2(0, 8), 21, INK, true, true)
+	buttons.append({"id": id, "rect": rect, "enabled": true})
+
 func bar(rect: Rect2, ratio: float, tint: Color) -> void:
 	draw_rect(rect, Color("c6bda9"))
 	draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(ratio, 0, 1), rect.size.y)), tint)
@@ -188,6 +227,8 @@ func _draw() -> void:
 	background()
 	if screen == "home":
 		home_screen()
+	elif screen == "profile":
+		profile_screen()
 	else:
 		header()
 		world()
@@ -196,9 +237,7 @@ func _draw() -> void:
 			result_panel()
 		elif model.paused:
 			pause_panel()
-	if modal == "profile":
-		profile_panel()
-	elif modal == "coming":
+	if modal == "coming":
 		coming_panel()
 	draw_set_transform(Vector2.ZERO)
 
@@ -246,20 +285,39 @@ func home_screen() -> void:
 		var x := 22 + i * 174
 		button(nav_ids[i], Rect2(x, 1140, 154, 92), nav_titles[i])
 
-func profile_panel() -> void:
-	buttons.clear()
-	draw_rect(Rect2(0, 0, 720, 1280), Color(0.13, 0.14, 0.12, 0.66))
-	panel(Rect2(82, 310, 556, 595), PAPER, GOLD)
-	draw_circle(Vector2(360, 435), 70, Color("69766c"))
-	label_at("将", Vector2(360, 463), 92, PAPER, true, true)
-	label_at("无名校尉", Vector2(360, 553), 40, INK, true, true)
-	label_at("所属阵营  蜀", Vector2(360, 610), 22, Color("776a55"), true)
-	draw_line(Vector2(155, 647), Vector2(565, 647), Color("b9a984"), 1)
-	label_at("府库玉石", Vector2(176, 704), 22, GREEN)
-	label_at("%d" % bank, Vector2(544, 704), 28, INK, true)
-	label_at("永久练兵", Vector2(176, 755), 22, GOLD)
-	label_at("%d 阶" % permanent, Vector2(544, 755), 26, INK, true)
-	button("close_modal", Rect2(151, 805, 418, 60), "返回行营", true, true)
+func profile_screen() -> void:
+	label_at("主将档案", Vector2(28, 45), 29, INK, false, true)
+	button("back_home", Rect2(572, 17, 120, 45), "返回")
+	draw_line(Vector2(28, 72), Vector2(692, 72), Color("b9a984"), 1)
+	draw_rect(Rect2(46, 108, 628, 1080), Color("302e28"))
+
+	panel(Rect2(82, 150, 154, 154), Color("d8c8aa"), Color("746955"))
+	draw_circle(Vector2(159, 216), 47, Color("69766c"))
+	label_at("将", Vector2(159, 235), 67, PAPER, true, true)
+	label_at("无名校尉", Vector2(159, 286), 18, INK, true)
+	panel(Rect2(266, 158, 364, 62), Color("e8dfcd"), Color("9d9078"))
+	label_at("称号：无名校尉", Vector2(448, 197), 23, INK, true)
+	panel(Rect2(266, 238, 364, 62), Color("e8dfcd"), Color("9d9078"))
+	label_at("UID：等待账号系统接入", Vector2(448, 277), 20, Color("6f6656"), true)
+
+	setting_toggle("toggle_music", Rect2(76, 337, 180, 62), "音乐", bool(settings.music))
+	setting_toggle("toggle_sound", Rect2(270, 337, 180, 62), "音效", bool(settings.sound))
+	setting_toggle("toggle_damage_numbers", Rect2(464, 337, 180, 62), "伤害数字", bool(settings.damage_numbers))
+
+	panel(Rect2(76, 437, 568, 485), Color("e8dfcd"), Color("9d9078"))
+	label_at("挑战信息", Vector2(360, 492), 32, INK, true, true)
+	draw_line(Vector2(106, 515), Vector2(614, 515), Color("b9a984"), 1)
+	var stat_titles := ["挑战次数", "最高挑战进度", "头像收集数量", "战役完成数量", "天赋解锁数量"]
+	var stat_values := ["%d 次" % int(profile_stats.challenge_count), "%d%%" % int(profile_stats.best_progress), "%d" % int(profile_stats.avatars), "%d" % int(profile_stats.campaigns), "%d" % int(profile_stats.talents)]
+	for i in range(stat_titles.size()):
+		var y := 574 + i * 67
+		label_at(stat_titles[i], Vector2(116, y), 22, INK)
+		label_at(stat_values[i], Vector2(596, y), 24, GREEN if i == 1 else INK, true)
+		if i < stat_titles.size() - 1:
+			draw_line(Vector2(108, y + 22), Vector2(612, y + 22), Color(0.45, 0.4, 0.3, 0.22), 1)
+
+	button("entry_bug", Rect2(76, 972, 270, 74), "BUG反馈")
+	button("entry_suggestion", Rect2(374, 972, 270, 74), "建议反馈")
 
 func coming_panel() -> void:
 	buttons.clear()

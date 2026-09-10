@@ -19,13 +19,18 @@ func run() -> void:
 	await process_frame
 	check(view.screen == "home", "Game opens on the out-of-battle home screen")
 	view.action("profile")
-	check(view.modal == "profile", "Portrait opens player information")
-	view.action("close_modal")
+	check(view.screen == "profile", "Portrait opens the player profile page")
+	check(bool(view.settings.music) and bool(view.settings.sound) and bool(view.settings.damage_numbers), "Profile settings default to enabled")
+	view.action("toggle_music")
+	view.action("toggle_damage_numbers")
+	check(not bool(view.settings.music) and not bool(view.settings.damage_numbers), "Profile settings can be disabled")
+	view.action("back_home")
 	view.action("entry_strategy")
 	check(view.modal == "coming" and view.modal_title == "军略", "Strategy entry is available")
 	view.action("close_modal")
 	view.action("start_battle")
 	check(view.screen == "battle", "Start button enters battle")
+	check(int(view.profile_stats.challenge_count) == 1, "Starting a run records one challenge")
 	view.queue_redraw()
 	await process_frame
 	await process_frame
@@ -49,14 +54,17 @@ func run() -> void:
 	view.action("buy_bow_unlock")
 	check(view.model.bow_open, "UI purchase unlocks barracks")
 	view.model.jade = 22
+	view.model.wave = 3
 	view.action("retreat")
 	check(view.screen == "result" and view.bank == 22, "Retreat settles jade")
+	check(int(view.profile_stats.best_progress) == 50, "Settlement saves the highest challenge progress")
 	view.action("training")
 	check(view.bank == 14 and view.permanent == 1, "Permanent upgrade spends saved jade")
 	view.bank = 0
 	view.permanent = 0
 	view.load_campaign()
 	check(view.bank == 14 and view.permanent == 1, "Saved progression survives reload")
+	check(not bool(view.settings.music) and not bool(view.settings.damage_numbers), "Profile settings survive reload")
 	view.action("restart")
 	check(view.model.max_hp == 280 and view.model.jade == 0 and view.screen == "battle", "Restart applies permanent growth and resets run")
 	view.action("home")
