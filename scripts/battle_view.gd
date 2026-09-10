@@ -13,7 +13,9 @@ var floats: Array[Dictionary] = []
 var buttons: Array[Dictionary] = []
 var tab := 0
 var barracks_kind := "sword"
-var screen := "battle"
+var screen := "home"
+var modal := ""
+var modal_title := ""
 var bank := 0
 var permanent := 0
 var bank_before := 0
@@ -123,6 +125,19 @@ func action(id: String) -> void:
 		model.buy(id.trim_prefix("buy_"))
 	else:
 		match id:
+			"profile": modal = "profile"
+			"close_modal": modal = ""
+			"start_battle":
+				model.reset(permanent)
+				floats.clear()
+				modal = ""
+				screen = "battle"
+			"home":
+				modal = ""
+				screen = "home"
+			"entry_campaign", "entry_shop", "entry_strategy", "entry_training":
+				modal_title = {"entry_campaign": "战役", "entry_shop": "商肆", "entry_strategy": "军略", "entry_training": "校场"}[id]
+				modal = "coming"
 			"pause": model.paused = true
 			"resume": model.paused = false
 			"retreat": model.finish(false)
@@ -171,13 +186,20 @@ func _draw() -> void:
 	draw_set_transform(Vector2(tr.x, tr.y), 0, Vector2.ONE * tr.z)
 	buttons.clear()
 	background()
-	header()
-	world()
-	footer()
-	if screen == "result":
-		result_panel()
-	elif model.paused:
-		pause_panel()
+	if screen == "home":
+		home_screen()
+	else:
+		header()
+		world()
+		footer()
+		if screen == "result":
+			result_panel()
+		elif model.paused:
+			pause_panel()
+	if modal == "profile":
+		profile_panel()
+	elif modal == "coming":
+		coming_panel()
 	draw_set_transform(Vector2.ZERO)
 
 func background() -> void:
@@ -197,6 +219,68 @@ func background() -> void:
 		draw_line(Vector2(x, y), Vector2(x - 9, y - 13), Color("b7b59c"), 2, true)
 		draw_line(Vector2(x, y), Vector2(x + 6, y - 18), Color("b7b59c"), 1, true)
 	label_at("长 坂 · 守 军", Vector2(360, 875), 42, Color(0.29, 0.3, 0.23, 0.09), true, true)
+
+func home_screen() -> void:
+	label_at("长坂行营", Vector2(28, 45), 29, INK, false, true)
+	draw_line(Vector2(28, 58), Vector2(692, 58), Color("b9a984"), 1)
+	# Player portrait doubles as the personal-information entry.
+	panel(Rect2(28, 78, 112, 112), Color("d8c8aa"), Color("746955"))
+	draw_circle(Vector2(84, 126), 31, Color("69766c"))
+	label_at("将", Vector2(84, 140), 45, PAPER, true, true)
+	label_at("无名校尉", Vector2(84, 178), 16, INK, true)
+	buttons.append({"id": "profile", "rect": Rect2(28, 78, 112, 112), "enabled": true})
+	label_at("主将档案", Vector2(157, 113), 24, INK, false, true)
+	label_at("点击头像查看个人信息", Vector2(157, 145), 17, Color("7d6e55"))
+	panel(Rect2(475, 79, 217, 65), Color("d9dfd0"), Color("8c9b83"))
+	draw_circle(Vector2(512, 111), 19, Color(GREEN, 0.12))
+	draw_arc(Vector2(512, 111), 18, 0, TAU, 32, GREEN, 2, true)
+	label_at("玉", Vector2(512, 119), 23, GREEN, true, true)
+	label_at("%d" % bank, Vector2(544, 121), 29, INK)
+	label_at("府库", Vector2(661, 119), 15, Color("65766a"), true)
+
+	# The central seal is temporary typographic art and can be replaced independently later.
+	draw_circle(Vector2(360, 389), 145, Color(0.37, 0.32, 0.22, 0.06))
+	draw_arc(Vector2(360, 389), 137, -2.8, 2.8, 64, Color("a99776"), 3, true)
+	label_at("蜀", Vector2(360, 424), 144, Color("665d4c"), true, true)
+	label_at("墨 阵 三 国", Vector2(360, 493), 35, INK, true, true)
+	label_at("聚将于营 · 决胜长坂", Vector2(360, 531), 20, Color("83755f"), true)
+
+	button("start_battle", Rect2(88, 760, 544, 88), "开始守城", true, true)
+	label_at("进入当前基础战斗玩法", Vector2(360, 879), 18, Color("7d6e55"), true)
+	button("entry_campaign", Rect2(151, 912, 418, 62), "战役 · 其他玩法入口")
+
+	var nav_ids := ["entry_shop", "entry_campaign", "entry_strategy", "entry_training"]
+	var nav_titles := ["商肆", "战役", "军略", "校场"]
+	var nav_notes := ["购买", "玩法", "天赋", "强化"]
+	for i in range(4):
+		var x := 22 + i * 174
+		button(nav_ids[i], Rect2(x, 1115, 154, 92), nav_titles[i])
+		label_at(nav_notes[i], Vector2(x + 77, 1233), 16, Color("847660"), true)
+	label_at("军略：天赋研习  ·  校场：永久属性养成", Vector2(360, 1265), 17, Color("786b56"), true)
+
+func profile_panel() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0, 0, 720, 1280), Color(0.13, 0.14, 0.12, 0.66))
+	panel(Rect2(82, 310, 556, 595), PAPER, GOLD)
+	draw_circle(Vector2(360, 435), 70, Color("69766c"))
+	label_at("将", Vector2(360, 463), 92, PAPER, true, true)
+	label_at("无名校尉", Vector2(360, 553), 40, INK, true, true)
+	label_at("所属阵营  蜀", Vector2(360, 610), 22, Color("776a55"), true)
+	draw_line(Vector2(155, 647), Vector2(565, 647), Color("b9a984"), 1)
+	label_at("府库玉石", Vector2(176, 704), 22, GREEN)
+	label_at("%d" % bank, Vector2(544, 704), 28, INK, true)
+	label_at("永久练兵", Vector2(176, 755), 22, GOLD)
+	label_at("%d 阶" % permanent, Vector2(544, 755), 26, INK, true)
+	button("close_modal", Rect2(151, 805, 418, 60), "返回行营", true, true)
+
+func coming_panel() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0, 0, 720, 1280), Color(0.13, 0.14, 0.12, 0.66))
+	panel(Rect2(105, 435, 510, 350), PAPER, GOLD)
+	label_at(modal_title, Vector2(360, 535), 52, RED, true, true)
+	label_at("入口已经开放", Vector2(360, 596), 25, INK, true)
+	label_at("具体玩法将在后续版本制作", Vector2(360, 641), 21, Color("7d6e55"), true)
+	button("close_modal", Rect2(160, 690, 400, 57), "返回行营", true, true)
 
 func header() -> void:
 	label_at("墨阵三国", Vector2(30, 46), 30, INK, false, true)
@@ -362,7 +446,8 @@ func result_panel() -> void:
 	label_at("府库 %d 玉  ·  永久练兵 %d 阶" % [bank, permanent], Vector2(360, 617), 24, INK, true)
 	label_at("永久练兵：下局主城生命 +20，士兵攻击 +5%", Vector2(360, 659), 20, Color("7d6e55"), true)
 	button("training", Rect2(130, 696, 460, 62), "永久练兵 · %d 玉" % (8 + permanent * 5), bank >= 8 + permanent * 5)
-	button("restart", Rect2(130, 786, 460, 65), "再守一局", true, true)
+	button("home", Rect2(130, 786, 220, 65), "返回行营", true, true)
+	button("restart", Rect2(370, 786, 220, 65), "再守一局", true, true)
 	label_at(save_error if not save_error.is_empty() else "已自动保存 · 局内粮草与强化下局重置", Vector2(360, 917), 19, RED if not save_error.is_empty() else Color("7d6e55"), true)
 
 func draw_worker(worker: Dictionary) -> void:

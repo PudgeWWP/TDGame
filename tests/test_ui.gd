@@ -17,6 +17,18 @@ func run() -> void:
 	view.queue_redraw()
 	await process_frame
 	await process_frame
+	check(view.screen == "home", "Game opens on the out-of-battle home screen")
+	view.action("profile")
+	check(view.modal == "profile", "Portrait opens player information")
+	view.action("close_modal")
+	view.action("entry_strategy")
+	check(view.modal == "coming" and view.modal_title == "军略", "Strategy entry is available")
+	view.action("close_modal")
+	view.action("start_battle")
+	check(view.screen == "battle", "Start button enters battle")
+	view.queue_redraw()
+	await process_frame
+	await process_frame
 	var event := InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = true
@@ -47,6 +59,8 @@ func run() -> void:
 	check(view.bank == 14 and view.permanent == 1, "Saved progression survives reload")
 	view.action("restart")
 	check(view.model.max_hp == 280 and view.model.jade == 0 and view.screen == "battle", "Restart applies permanent growth and resets run")
+	view.action("home")
+	check(view.screen == "home", "Settlement can return to the home screen")
 	DirAccess.remove_absolute(view.save_path)
 	print("UI TESTS: ", failures, " failures")
 	quit(0 if failures == 0 else 1)
