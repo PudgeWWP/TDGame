@@ -44,7 +44,8 @@ func _ready() -> void:
 			floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
 	model.finished.connect(_on_finished)
 	if "--capture-profile" in OS.get_cmdline_user_args():
-		screen = "profile"
+		screen = "home"
+		modal = "profile"
 		set_process(false)
 		await get_tree().process_frame
 		await RenderingServer.frame_post_draw
@@ -145,8 +146,7 @@ func action(id: String) -> void:
 		model.buy(id.trim_prefix("buy_"))
 	else:
 		match id:
-			"profile": screen = "profile"
-			"back_home": screen = "home"
+			"profile": modal = "profile"
 			"close_modal": modal = ""
 			"start_battle":
 				model.reset(permanent)
@@ -227,8 +227,6 @@ func _draw() -> void:
 	background()
 	if screen == "home":
 		home_screen()
-	elif screen == "profile":
-		profile_screen()
 	else:
 		header()
 		world()
@@ -237,7 +235,9 @@ func _draw() -> void:
 			result_panel()
 		elif model.paused:
 			pause_panel()
-	if modal == "coming":
+	if modal == "profile":
+		profile_panel()
+	elif modal == "coming":
 		coming_panel()
 	draw_set_transform(Vector2.ZERO)
 
@@ -285,39 +285,43 @@ func home_screen() -> void:
 		var x := 22 + i * 174
 		button(nav_ids[i], Rect2(x, 1140, 154, 92), nav_titles[i])
 
-func profile_screen() -> void:
-	label_at("主将档案", Vector2(28, 45), 29, INK, false, true)
-	button("back_home", Rect2(572, 17, 120, 45), "返回")
-	draw_line(Vector2(28, 72), Vector2(692, 72), Color("b9a984"), 1)
-	draw_rect(Rect2(46, 108, 628, 1080), Color("302e28"))
+func profile_panel() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0, 0, 720, 1280), Color(0.10, 0.11, 0.10, 0.58))
+	draw_rect(Rect2(66, 210, 588, 850), Color("302e28"))
+	draw_rect(Rect2(66, 210, 588, 850), GOLD, false, 3)
 
-	panel(Rect2(82, 150, 154, 154), Color("d8c8aa"), Color("746955"))
-	draw_circle(Vector2(159, 216), 47, Color("69766c"))
-	label_at("将", Vector2(159, 235), 67, PAPER, true, true)
-	label_at("无名校尉", Vector2(159, 286), 18, INK, true)
-	panel(Rect2(266, 158, 364, 62), Color("e8dfcd"), Color("9d9078"))
-	label_at("称号：无名校尉", Vector2(448, 197), 23, INK, true)
-	panel(Rect2(266, 238, 364, 62), Color("e8dfcd"), Color("9d9078"))
-	label_at("UID：等待账号系统接入", Vector2(448, 277), 20, Color("6f6656"), true)
+	panel(Rect2(92, 252, 132, 132), Color("d8c8aa"), Color("746955"))
+	draw_circle(Vector2(158, 308), 41, Color("69766c"))
+	label_at("将", Vector2(158, 325), 58, PAPER, true, true)
+	label_at("无名校尉", Vector2(158, 369), 16, INK, true)
+	panel(Rect2(250, 257, 365, 52), Color("e8dfcd"), Color("9d9078"))
+	label_at("称号：无名校尉", Vector2(432, 290), 21, INK, true)
+	panel(Rect2(250, 325, 365, 52), Color("e8dfcd"), Color("9d9078"))
+	label_at("UID：等待账号系统接入", Vector2(432, 358), 18, Color("6f6656"), true)
 
-	setting_toggle("toggle_music", Rect2(76, 337, 180, 62), "音乐", bool(settings.music))
-	setting_toggle("toggle_sound", Rect2(270, 337, 180, 62), "音效", bool(settings.sound))
-	setting_toggle("toggle_damage_numbers", Rect2(464, 337, 180, 62), "伤害数字", bool(settings.damage_numbers))
+	setting_toggle("toggle_music", Rect2(88, 414, 170, 55), "音乐", bool(settings.music))
+	setting_toggle("toggle_sound", Rect2(275, 414, 170, 55), "音效", bool(settings.sound))
+	setting_toggle("toggle_damage_numbers", Rect2(462, 414, 170, 55), "伤害数字", bool(settings.damage_numbers))
 
-	panel(Rect2(76, 437, 568, 485), Color("e8dfcd"), Color("9d9078"))
-	label_at("挑战信息", Vector2(360, 492), 32, INK, true, true)
-	draw_line(Vector2(106, 515), Vector2(614, 515), Color("b9a984"), 1)
+	panel(Rect2(88, 504, 544, 365), Color("e8dfcd"), Color("9d9078"))
+	label_at("挑战信息", Vector2(360, 550), 29, INK, true, true)
+	draw_line(Vector2(112, 570), Vector2(608, 570), Color("b9a984"), 1)
 	var stat_titles := ["挑战次数", "最高挑战进度", "头像收集数量", "战役完成数量", "天赋解锁数量"]
 	var stat_values := ["%d 次" % int(profile_stats.challenge_count), "%d%%" % int(profile_stats.best_progress), "%d" % int(profile_stats.avatars), "%d" % int(profile_stats.campaigns), "%d" % int(profile_stats.talents)]
 	for i in range(stat_titles.size()):
-		var y := 574 + i * 67
-		label_at(stat_titles[i], Vector2(116, y), 22, INK)
-		label_at(stat_values[i], Vector2(596, y), 24, GREEN if i == 1 else INK, true)
+		var y := 618 + i * 54
+		label_at(stat_titles[i], Vector2(118, y), 20, INK)
+		label_at(stat_values[i], Vector2(590, y), 22, GREEN if i == 1 else INK, true)
 		if i < stat_titles.size() - 1:
-			draw_line(Vector2(108, y + 22), Vector2(612, y + 22), Color(0.45, 0.4, 0.3, 0.22), 1)
+			draw_line(Vector2(112, y + 17), Vector2(608, y + 17), Color(0.45, 0.4, 0.3, 0.22), 1)
 
-	button("entry_bug", Rect2(76, 972, 270, 74), "BUG反馈")
-	button("entry_suggestion", Rect2(374, 972, 270, 74), "建议反馈")
+	button("entry_bug", Rect2(88, 910, 258, 66), "BUG反馈")
+	button("entry_suggestion", Rect2(374, 910, 258, 66), "建议反馈")
+	draw_circle(Vector2(630, 222), 31, Color("302e28"))
+	draw_circle(Vector2(630, 222), 29, Color("f1e7d3"))
+	label_at("×", Vector2(630, 232), 34, INK, true)
+	buttons.append({"id": "close_modal", "rect": Rect2(598, 190, 64, 64), "enabled": true})
 
 func coming_panel() -> void:
 	buttons.clear()
