@@ -60,6 +60,8 @@ func _ready() -> void:
 	if "--capture-avatar" in OS.get_cmdline_user_args():
 		screen = "home"
 		modal = "avatar"
+		current_avatar = 4
+		selected_avatar = 5
 		avatar_scroll = AVATAR_SCROLL_MAX
 		set_process(false)
 		await get_tree().process_frame
@@ -436,7 +438,7 @@ func avatar_panel() -> void:
 		var rect := Rect2(108 + column * 177, grid_top + row * 145 - avatar_scroll, 150, 132)
 		if rect.intersects(grid_view):
 			var unlocked := index < TEST_UNLOCKED_AVATARS
-			draw_avatar_tile(rect, index, unlocked, selected_avatar == index)
+			draw_avatar_tile(rect, index, unlocked, selected_avatar == index, current_avatar == index)
 			if unlocked:
 				buttons.append({"id": "avatar_choice_%d" % index, "rect": rect.intersection(grid_view), "enabled": true})
 	# Redraw the fixed areas over the scrolling cards to clip all overflow.
@@ -455,11 +457,20 @@ func avatar_panel() -> void:
 	label_at("←", Vector2(90, 232), 32, INK, true)
 	buttons.append({"id": "close_avatar", "rect": Rect2(58, 190, 64, 64), "enabled": true})
 
-func draw_avatar_tile(rect: Rect2, index: int, unlocked: bool, selected: bool) -> void:
+func draw_avatar_tile(rect: Rect2, index: int, unlocked: bool, selected: bool, in_use := false) -> void:
 	panel(rect, Color("d8c8aa"), GOLD if selected else Color("746955"))
 	draw_circle(rect.position + Vector2(rect.size.x * 0.5, 52), 35, Color("69766c"))
 	label_at(AVATAR_GLYPHS[index], rect.position + Vector2(rect.size.x * 0.5, 66), 48, PAPER, true, true)
 	label_at("头像 %02d" % (index + 1), rect.position + Vector2(rect.size.x * 0.5, 116), 16, INK, true)
+	if in_use:
+		var badge := PackedVector2Array([
+			rect.position,
+			rect.position + Vector2(76, 0),
+			rect.position + Vector2(66, 27),
+			rect.position + Vector2(0, 27),
+		])
+		draw_colored_polygon(badge, GREEN)
+		label_at("使用中", rect.position + Vector2(33, 20), 15, PAPER, true, true)
 	if not unlocked:
 		draw_rect(rect, Color(0.22, 0.22, 0.22, 0.66))
 		var lock_center := rect.get_center() + Vector2(0, -4)
