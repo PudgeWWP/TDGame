@@ -6,6 +6,8 @@ const PAPER := Color("eae0c9")
 const RED := Color("a84435")
 const GREEN := Color("3f675b")
 const GOLD := Color("ae803c")
+const AVATAR_GLYPHS := ["将", "赵", "关", "张", "诸", "马", "黄", "魏", "吕", "孙", "周", "司"]
+const TEST_UNLOCKED_AVATARS := 6
 var model = BattleModel.new()
 var font: Font
 var ui_font: Font
@@ -23,7 +25,10 @@ var save_error := ""
 var save_path := "user://campaign_v1.json"
 var accumulator := 0.0
 var settings := {"music": true, "sound": true, "damage_numbers": true}
-var profile_stats := {"challenge_count": 0, "best_progress": 0, "avatars": 0, "campaigns": 0, "talents": 0}
+var profile_stats := {"challenge_count": 0, "best_progress": 0, "avatars": TEST_UNLOCKED_AVATARS, "campaigns": 0, "talents": 0}
+var current_avatar := 0
+var selected_avatar := 0
+var avatar_scroll := 0.0
 
 func _ready() -> void:
 	var f := SystemFont.new()
@@ -43,6 +48,15 @@ func _ready() -> void:
 		if bool(settings.damage_numbers) or not t.begins_with("-"):
 			floats.append({"text": t, "pos": p, "color": c, "life": 1.0}))
 	model.finished.connect(_on_finished)
+	if "--capture-avatar" in OS.get_cmdline_user_args():
+		screen = "home"
+		modal = "avatar"
+		avatar_scroll = 150.0
+		set_process(false)
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("user://avatar_preview.png")
+		get_tree().quit()
 	if "--capture-profile" in OS.get_cmdline_user_args():
 		screen = "home"
 		modal = "profile"
@@ -77,6 +91,9 @@ func load_campaign() -> void:
 		var saved_stats: Dictionary = data.get("profile_stats", {})
 		for key in profile_stats:
 			profile_stats[key] = maxi(0, int(saved_stats.get(key, profile_stats[key])))
+		profile_stats.avatars = maxi(TEST_UNLOCKED_AVATARS, int(profile_stats.avatars))
+		current_avatar = clampi(int(data.get("current_avatar", 0)), 0, TEST_UNLOCKED_AVATARS - 1)
+		selected_avatar = current_avatar
 
 func save_campaign() -> bool:
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
@@ -84,7 +101,7 @@ func save_campaign() -> bool:
 		save_error = "存档失败，请保持窗口开启后重试"
 		return false
 	file.store_string(JSON.stringify({"version": 1, "jade": bank, "training": permanent,
-		"settings": settings, "profile_stats": profile_stats}))
+		"settings": settings, "profile_stats": profile_stats, "current_avatar": current_avatar}))
 	file.close()
 	save_error = ""
 	return true
@@ -116,6 +133,20 @@ func transform_info() -> Vector3:
 	return Vector3((size.x - 720 * scale_factor) * 0.5, (size.y - 1280 * scale_factor) * 0.5, scale_factor)
 
 func _gui_input(event: InputEvent) -> void:
+	if modal == "avatar":
+		if event is InputEventScreenDrag:
+			avatar_scroll = clampf(avatar_scroll - event.relative.y, 0.0, 150.0)
+			accept_event()
+			return
+		if event is InputEventMouseButton and event.pressed:
+			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				avatar_scroll = minf(150.0, avatar_scroll + 65.0)
+				accept_event()
+				return
+			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+				avatar_scroll = maxf(0.0, avatar_scroll - 65.0)
+				accept_event()
+				return
 	var point := Vector2.ZERO
 	var accepted := false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -142,11 +173,24 @@ func action(id: String) -> void:
 		tab = int(id.trim_prefix("tab_"))
 	elif id.begins_with("barracks_"):
 		barracks_kind = id.trim_prefix("barracks_")
+	elif id.begins_with("avatar_choice_"):
+		var index := int(id.trim_prefix("avatar_choice_"))
+		if index < TEST_UNLOCKED_AVATARS:
+			selected_avatar = index
 	elif id.begins_with("buy_"):
 		model.buy(id.trim_prefix("buy_"))
 	else:
 		match id:
 			"profile": modal = "profile"
+			"avatar_picker":
+				selected_avatar = current_avatar
+				avatar_scroll = 0.0
+				modal = "avatar"
+			"close_avatar": modal = "profile"
+			"apply_avatar":
+				if selected_avatar != current_avatar and selected_avatar < TEST_UNLOCKED_AVATARS:
+					current_avatar = selected_avatar
+					save_campaign()
 			"close_modal": modal = ""
 			"start_battle":
 				model.reset(permanent)
@@ -237,6 +281,8 @@ func _draw() -> void:
 			pause_panel()
 	if modal == "profile":
 		profile_panel()
+	elif modal == "avatar":
+		avatar_panel()
 	elif modal == "coming":
 		coming_panel()
 	draw_set_transform(Vector2.ZERO)
@@ -265,7 +311,7 @@ func home_screen() -> void:
 	# Player portrait doubles as the personal-information entry.
 	panel(Rect2(28, 78, 112, 112), Color("d8c8aa"), Color("746955"))
 	draw_circle(Vector2(84, 126), 31, Color("69766c"))
-	label_at("将", Vector2(84, 140), 45, PAPER, true, true)
+	label_at(AVATAR_GLYPHS[current_avatar], Vector2(84, 140), 45, PAPER, true, true)
 	label_at("无名校尉", Vector2(84, 178), 16, INK, true)
 	buttons.append({"id": "profile", "rect": Rect2(28, 78, 112, 112), "enabled": true})
 	resource_counter(Vector2(615, 35), "玉", bank, GREEN)
@@ -293,8 +339,9 @@ func profile_panel() -> void:
 
 	panel(Rect2(92, 252, 132, 132), Color("d8c8aa"), Color("746955"))
 	draw_circle(Vector2(158, 308), 41, Color("69766c"))
-	label_at("将", Vector2(158, 325), 58, PAPER, true, true)
+	label_at(AVATAR_GLYPHS[current_avatar], Vector2(158, 325), 58, PAPER, true, true)
 	label_at("无名校尉", Vector2(158, 369), 16, INK, true)
+	buttons.append({"id": "avatar_picker", "rect": Rect2(92, 252, 132, 132), "enabled": true})
 	panel(Rect2(250, 257, 365, 52), Color("e8dfcd"), Color("9d9078"))
 	label_at("称号：无名校尉", Vector2(432, 290), 21, INK, true)
 	panel(Rect2(250, 325, 365, 52), Color("e8dfcd"), Color("9d9078"))
@@ -322,6 +369,53 @@ func profile_panel() -> void:
 	draw_circle(Vector2(630, 222), 29, Color("f1e7d3"))
 	label_at("×", Vector2(630, 232), 34, INK, true)
 	buttons.append({"id": "close_modal", "rect": Rect2(598, 190, 64, 64), "enabled": true})
+
+func avatar_panel() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0, 0, 720, 1280), Color(0.10, 0.11, 0.10, 0.58))
+	draw_rect(Rect2(66, 210, 588, 850), Color("302e28"))
+	draw_rect(Rect2(66, 210, 588, 850), GOLD, false, 3)
+	label_at("当前头像", Vector2(360, 260), 27, PAPER, true, true)
+	draw_avatar_tile(Rect2(285, 282, 150, 142), current_avatar, true, selected_avatar == current_avatar)
+	label_at("选择头像", Vector2(102, 470), 24, PAPER, false, true)
+	draw_line(Vector2(102, 484), Vector2(618, 484), Color("8e8068"), 1)
+
+	var grid_top := 505.0
+	for index in range(AVATAR_GLYPHS.size()):
+		var row := index / 3
+		var column := index % 3
+		var rect := Rect2(94 + column * 177, grid_top + row * 145 - avatar_scroll, 150, 132)
+		if rect.position.y >= 495 and rect.end.y <= 925:
+			var unlocked := index < TEST_UNLOCKED_AVATARS
+			draw_avatar_tile(rect, index, unlocked, selected_avatar == index)
+			if unlocked:
+				buttons.append({"id": "avatar_choice_%d" % index, "rect": rect, "enabled": true})
+	var scroll_ratio := avatar_scroll / 150.0
+	draw_rect(Rect2(632, 505, 5, 412), Color("5e584d"))
+	draw_rect(Rect2(632, 505 + scroll_ratio * 292, 5, 120), Color("d2bd8b"))
+	avatar_change_button(Rect2(190, 955, 340, 67))
+	draw_circle(Vector2(630, 222), 31, Color("302e28"))
+	draw_circle(Vector2(630, 222), 29, Color("f1e7d3"))
+	label_at("×", Vector2(630, 232), 34, INK, true)
+	buttons.append({"id": "close_avatar", "rect": Rect2(598, 190, 64, 64), "enabled": true})
+
+func draw_avatar_tile(rect: Rect2, index: int, unlocked: bool, selected: bool) -> void:
+	panel(rect, Color("d8c8aa"), GOLD if selected else Color("746955"))
+	draw_circle(rect.position + Vector2(rect.size.x * 0.5, 52), 35, Color("69766c"))
+	label_at(AVATAR_GLYPHS[index], rect.position + Vector2(rect.size.x * 0.5, 66), 48, PAPER, true, true)
+	label_at("头像 %02d" % (index + 1), rect.position + Vector2(rect.size.x * 0.5, 116), 16, INK, true)
+	if not unlocked:
+		draw_rect(rect, Color(0.22, 0.22, 0.22, 0.66))
+		var lock_center := rect.get_center() + Vector2(0, -4)
+		draw_arc(lock_center + Vector2(0, -8), 13, PI, TAU, 16, PAPER, 4, true)
+		draw_rect(Rect2(lock_center + Vector2(-16, -7), Vector2(32, 29)), PAPER)
+		label_at("锁", lock_center + Vector2(0, 15), 18, INK, true, true)
+
+func avatar_change_button(rect: Rect2) -> void:
+	var enabled := selected_avatar != current_avatar and selected_avatar < TEST_UNLOCKED_AVATARS
+	panel(rect, Color("e0b947") if enabled else Color("d4d0c6"), Color("7f735e"))
+	label_at("更换头像", rect.get_center() + Vector2(0, 9), 25, INK if enabled else Color("8d887d"), true, true)
+	buttons.append({"id": "apply_avatar", "rect": rect, "enabled": enabled})
 
 func coming_panel() -> void:
 	buttons.clear()
