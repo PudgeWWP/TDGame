@@ -8,6 +8,7 @@ const GREEN := Color("3f675b")
 const GOLD := Color("ae803c")
 const AVATAR_GLYPHS := ["将", "赵", "关", "张", "诸", "马", "黄", "魏", "吕", "孙", "周", "司"]
 const TEST_UNLOCKED_AVATARS := 6
+const AVATAR_SCROLL_MAX := 145.0
 var model = BattleModel.new()
 var font: Font
 var ui_font: Font
@@ -29,6 +30,9 @@ var profile_stats := {"challenge_count": 0, "best_progress": 0, "avatars": TEST_
 var current_avatar := 0
 var selected_avatar := 0
 var avatar_scroll := 0.0
+var avatar_pointer_dragging := false
+var avatar_drag_origin := Vector2.ZERO
+var avatar_scroll_origin := 0.0
 
 func _ready() -> void:
 	var f := SystemFont.new()
@@ -51,7 +55,7 @@ func _ready() -> void:
 	if "--capture-avatar" in OS.get_cmdline_user_args():
 		screen = "home"
 		modal = "avatar"
-		avatar_scroll = 150.0
+		avatar_scroll = AVATAR_SCROLL_MAX
 		set_process(false)
 		await get_tree().process_frame
 		await RenderingServer.frame_post_draw
@@ -134,19 +138,38 @@ func transform_info() -> Vector3:
 
 func _gui_input(event: InputEvent) -> void:
 	if modal == "avatar":
-		if event is InputEventScreenDrag:
-			avatar_scroll = clampf(avatar_scroll - event.relative.y, 0.0, 150.0)
+		if event is InputEventScreenTouch:
+			if event.pressed:
+				begin_avatar_drag(event.position)
+			else:
+				finish_avatar_drag(event.position)
+			accept_event()
+			return
+		if event is InputEventScreenDrag and avatar_pointer_dragging:
+			update_avatar_drag(event.position)
 			accept_event()
 			return
 		if event is InputEventMouseButton and event.pressed:
 			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				avatar_scroll = minf(150.0, avatar_scroll + 65.0)
+				avatar_scroll = minf(AVATAR_SCROLL_MAX, avatar_scroll + 65.0)
 				accept_event()
 				return
 			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 				avatar_scroll = maxf(0.0, avatar_scroll - 65.0)
 				accept_event()
 				return
+			elif event.button_index == MOUSE_BUTTON_LEFT:
+				begin_avatar_drag(event.position)
+				accept_event()
+				return
+		if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			finish_avatar_drag(event.position)
+			accept_event()
+			return
+		if event is InputEventMouseMotion and avatar_pointer_dragging:
+			update_avatar_drag(event.position)
+			accept_event()
+			return
 	var point := Vector2.ZERO
 	var accepted := false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -167,6 +190,31 @@ func _gui_input(event: InputEvent) -> void:
 			return
 	if screen == "battle":
 		model.collect(point)
+
+func begin_avatar_drag(point: Vector2) -> void:
+	avatar_pointer_dragging = true
+	avatar_drag_origin = point
+	avatar_scroll_origin = avatar_scroll
+
+func update_avatar_drag(point: Vector2) -> void:
+	var tr := transform_info()
+	var moved_y := (point.y - avatar_drag_origin.y) / tr.z
+	avatar_scroll = clampf(avatar_scroll_origin - moved_y, 0.0, AVATAR_SCROLL_MAX)
+
+func finish_avatar_drag(point: Vector2) -> void:
+	if not avatar_pointer_dragging:
+		return
+	var was_click := point.distance_to(avatar_drag_origin) < 8.0
+	avatar_pointer_dragging = false
+	if not was_click:
+		return
+	var tr := transform_info()
+	var design_point := (point - Vector2(tr.x, tr.y)) / tr.z
+	for item in buttons:
+		if item.rect.has_point(design_point):
+			if item.enabled:
+				action(item.id)
+			return
 
 func action(id: String) -> void:
 	if id.begins_with("tab_"):
@@ -385,19 +433,24 @@ func avatar_panel() -> void:
 		var row := index / 3
 		var column := index % 3
 		var rect := Rect2(94 + column * 177, grid_top + row * 145 - avatar_scroll, 150, 132)
-		if rect.position.y >= 495 and rect.end.y <= 925:
+		if rect.end.y > 495 and rect.position.y < 925:
 			var unlocked := index < TEST_UNLOCKED_AVATARS
 			draw_avatar_tile(rect, index, unlocked, selected_avatar == index)
 			if unlocked:
 				buttons.append({"id": "avatar_choice_%d" % index, "rect": rect, "enabled": true})
-	var scroll_ratio := avatar_scroll / 150.0
+	# Mask only the overflow; partially visible edge rows show that the list continues.
+	draw_rect(Rect2(66, 470, 588, 25), Color("302e28"))
+	draw_rect(Rect2(66, 925, 588, 25), Color("302e28"))
+	label_at("选择头像", Vector2(102, 470), 24, PAPER, false, true)
+	draw_line(Vector2(102, 484), Vector2(618, 484), Color("8e8068"), 1)
+	var scroll_ratio := avatar_scroll / AVATAR_SCROLL_MAX
 	draw_rect(Rect2(632, 505, 5, 412), Color("5e584d"))
 	draw_rect(Rect2(632, 505 + scroll_ratio * 292, 5, 120), Color("d2bd8b"))
 	avatar_change_button(Rect2(190, 955, 340, 67))
-	draw_circle(Vector2(630, 222), 31, Color("302e28"))
-	draw_circle(Vector2(630, 222), 29, Color("f1e7d3"))
-	label_at("×", Vector2(630, 232), 34, INK, true)
-	buttons.append({"id": "close_avatar", "rect": Rect2(598, 190, 64, 64), "enabled": true})
+	draw_circle(Vector2(90, 222), 31, Color("302e28"))
+	draw_circle(Vector2(90, 222), 29, Color("f1e7d3"))
+	label_at("←", Vector2(90, 232), 32, INK, true)
+	buttons.append({"id": "close_avatar", "rect": Rect2(58, 190, 64, 64), "enabled": true})
 
 func draw_avatar_tile(rect: Rect2, index: int, unlocked: bool, selected: bool) -> void:
 	panel(rect, Color("d8c8aa"), GOLD if selected else Color("746955"))

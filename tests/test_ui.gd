@@ -22,9 +22,33 @@ func run() -> void:
 	check(view.screen == "home" and view.modal == "profile", "Portrait opens a profile panel over the home screen")
 	view.action("avatar_picker")
 	check(view.modal == "avatar" and view.selected_avatar == view.current_avatar, "Profile avatar opens the avatar picker")
+	var tr_drag: Vector3 = view.transform_info()
+	var mouse_down := InputEventMouseButton.new()
+	mouse_down.button_index = MOUSE_BUTTON_LEFT
+	mouse_down.pressed = true
+	mouse_down.position = Vector2(350, 800) * tr_drag.z + Vector2(tr_drag.x, tr_drag.y)
+	view._gui_input(mouse_down)
+	var mouse_move := InputEventMouseMotion.new()
+	mouse_move.position = Vector2(350, 680) * tr_drag.z + Vector2(tr_drag.x, tr_drag.y)
+	view._gui_input(mouse_move)
+	var mouse_up := InputEventMouseButton.new()
+	mouse_up.button_index = MOUSE_BUTTON_LEFT
+	mouse_up.pressed = false
+	mouse_up.position = mouse_move.position
+	view._gui_input(mouse_up)
+	check(view.avatar_scroll > 0, "Avatar list scrolls by holding and dragging the mouse")
+	view.avatar_scroll = 0
+	var touch_down := InputEventScreenTouch.new()
+	touch_down.pressed = true
+	touch_down.position = Vector2(350, 800) * tr_drag.z + Vector2(tr_drag.x, tr_drag.y)
+	view._gui_input(touch_down)
 	var drag := InputEventScreenDrag.new()
-	drag.relative = Vector2(0, -90)
+	drag.position = Vector2(350, 700) * tr_drag.z + Vector2(tr_drag.x, tr_drag.y)
 	view._gui_input(drag)
+	var touch_up := InputEventScreenTouch.new()
+	touch_up.pressed = false
+	touch_up.position = drag.position
+	view._gui_input(touch_up)
 	check(view.avatar_scroll > 0, "Avatar list scrolls vertically on touch drag")
 	view.action("avatar_choice_0")
 	check(view.selected_avatar == view.current_avatar, "Selecting the current avatar keeps change disabled")
