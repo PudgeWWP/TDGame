@@ -76,6 +76,17 @@ func _ready() -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("user://profile_preview.png")
 		get_tree().quit()
+	if "--capture-result" in OS.get_cmdline_user_args():
+		screen = "result"
+		model.won = false
+		model.wave = 5
+		model.elapsed = 180.0
+		model.jade = 13
+		set_process(false)
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("user://result_preview.png")
+		get_tree().quit()
 	if "--capture-demo" in OS.get_cmdline_user_args():
 		model.buy("bow_unlock")
 		for i in range(1900):
@@ -654,17 +665,13 @@ func pause_panel() -> void:
 func result_panel() -> void:
 	buttons.clear()
 	draw_rect(Rect2(0, 0, 720, 1280), Color(0.13, 0.14, 0.12, 0.72))
-	panel(Rect2(75, 315, 570, 670), PAPER, GOLD)
+	panel(Rect2(75, 315, 570, 420), PAPER, GOLD)
 	label_at("守城告捷" if model.won else "整军再战", Vector2(360, 400), 56, RED, true, true)
 	label_at("抵御 %d / %d 波 · 坚守 %d 秒" % [model.wave, model.config.total_waves, int(model.elapsed)], Vector2(360, 450), 23, INK, true)
 	label_at("本局玉石全部入库", Vector2(360, 507), 24, GREEN, true)
 	label_at("+ %d 玉" % model.jade, Vector2(360, 565), 48, GREEN, true, true)
-	label_at("府库 %d 玉  ·  永久练兵 %d 阶" % [bank, permanent], Vector2(360, 617), 24, INK, true)
-	label_at("永久练兵：下局主城生命 +20，士兵攻击 +5%", Vector2(360, 659), 20, Color("7d6e55"), true)
-	button("training", Rect2(130, 696, 460, 62), "永久练兵 · %d 玉" % (8 + permanent * 5), bank >= 8 + permanent * 5)
-	button("home", Rect2(130, 786, 220, 65), "返回行营", true, true)
-	button("restart", Rect2(370, 786, 220, 65), "再守一局", true, true)
-	label_at(save_error if not save_error.is_empty() else "已自动保存 · 局内粮草与强化下局重置", Vector2(360, 917), 19, RED if not save_error.is_empty() else Color("7d6e55"), true)
+	button("home", Rect2(130, 625, 220, 65), "返回行营", true, true)
+	button("restart", Rect2(370, 625, 220, 65), "再守一局", true, true)
 
 func draw_worker(worker: Dictionary) -> void:
 	var p: Vector2 = worker.pos

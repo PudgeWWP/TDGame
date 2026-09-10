@@ -99,16 +99,20 @@ func run() -> void:
 	view.action("retreat")
 	check(view.screen == "result" and view.bank == 22, "Retreat settles jade")
 	check(int(view.profile_stats.best_progress) == 50, "Settlement saves the highest challenge progress")
-	view.action("training")
-	check(view.bank == 14 and view.permanent == 1, "Permanent upgrade spends saved jade")
+	view.queue_redraw()
+	await process_frame
+	var result_actions: Array[String] = []
+	for item in view.buttons:
+		result_actions.append(str(item.id))
+	check(result_actions == ["home", "restart"], "Settlement only offers home and restart actions")
+	view.save_campaign()
 	view.bank = 0
-	view.permanent = 0
 	view.load_campaign()
-	check(view.bank == 14 and view.permanent == 1, "Saved progression survives reload")
+	check(view.bank == 22, "Settled jade survives reload")
 	check(not bool(view.settings.music) and not bool(view.settings.damage_numbers), "Profile settings survive reload")
 	check(view.current_avatar == 1 and int(view.profile_stats.avatars) == 6, "Avatar choice and unlocked count survive reload")
 	view.action("restart")
-	check(view.model.max_hp == 280 and view.model.jade == 0 and view.screen == "battle", "Restart applies permanent growth and resets run")
+	check(view.model.max_hp == 260 and view.model.jade == 0 and view.screen == "battle", "Restart resets the run")
 	view.action("home")
 	check(view.screen == "home", "Settlement can return to the home screen")
 	DirAccess.remove_absolute(view.save_path)
